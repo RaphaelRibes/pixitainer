@@ -2,8 +2,7 @@ Bootstrap: docker
 From: ubuntu:24.04
 
 %files
-    pixi.toml /app/pixi.toml
-    pixi.lock /app/pixi.lock
+    {{ FILES_SECTION }}
 
 %environment
     # Set the path to the global Pixi installation
@@ -36,5 +35,5 @@ From: ubuntu:24.04
     rm -rf /var/lib/apt/lists/*
 
 %runscript
-    cd /app
-    exec "$@"
+    # cd /app
+    {{ RUNSCRIPT_CONTENT }}
