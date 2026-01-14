@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+import argparse
+import subprocess
+import sys
+import shutil
+from pathlib import Path
+
+# --- EMBEDDED TEMPLATE ---
+# This ensures the extension works anywhere without needing the .def file present
+TEMPLATE_CONTENT = """Bootstrap: docker
+From: ubuntu:24.04
+
+%files
+    {{ FILES_SECTION }}
+
+%environment
+    # Set the path to the global Pixi installation
+    export PIXI_HOME=/opt/pixi
+    export PATH="/opt/pixi/bin:$PATH"
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+
+    # 1. Install system dependencies
+    apt-get update && apt-get install -y curl
+
+    # 2. Install Pixi globally to /opt/pixi (instead of /root)
+    export PIXI_HOME=/opt/pixi
+    curl -fsSL https://pixi.sh/install.sh | bash
+    export PATH="/opt/pixi/bin:$PATH"
+
+    # 3. Setup the Project Environment
+    mkdir -p /app
+    cd /app
+
+    echo "Installing project environment..."
+    # We use --frozen to ensure it perfectly matches the lockfile
+    if [ -f pixi.lock ]; then
+        pixi install --frozen
+    else
+        pixi install
+    fi
+
+    # 4. Cleanup to reduce image size
+    apt-get remove -y curl
+    apt-get autoremove -y
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+%runscript
+    # cd /app
+    {{ RUNSCRIPT_CONTENT }}
+"""
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Pixi extension to containerize a project with Apptainer")
+    parser.add_argument("--wd", default=".", help="Working directory")
+    parser.add_argument("--seamless", action="store_true", help="Enable seamless execution")
+    args = parser.parse_args()
+
+    # Resolve paths
+    wd = Path(args.wd).resolve()
+    tmp_dir = wd / ".tmp_pixitainer"
+
+    # Check for project files
+    pixi_toml = wd / "pixi.toml"
+    pixi_lock = wd / "pixi.lock"
+
+    if not pixi_toml.exists():
+        print(f"Error: pixi.toml not found in {wd}")
+        sys.exit(1)
+
+    print(f"📦 Containerizing project in: {wd}")
+
+    # Prepare .def file
+    tmp_dir.mkdir(exist_ok=True)
+    target_path = tmp_dir / "pixitainer.def"
+
+    # Prepare %files section
+    # Using .as_posix() ensures paths are compatible even if generated on Windows
+    files_section = f'    "{pixi_toml.as_posix()}" /app/pixi.toml\n'
+    if pixi_lock.exists():
+        files_section += f'    "{pixi_lock.as_posix()}" /app/pixi.lock'
+
+    # Seamless logic
+    runscript_content = 'exec pixi run "$@"' if args.seamless else 'exec "$@"'
+
+    # Write the template
+    content = TEMPLATE_CONTENT
+    content = content.replace("{{ FILES_SECTION }}", files_section)
+    content = content.replace("{{ RUNSCRIPT_CONTENT }}", runscript_content)
+    target_path.write_text(content, encoding="utf-8")
+
+    output_sif = wd / "pixitainer.sif"
+
+    # Platform specific logic
+    if sys.platform == "linux":
+        # On Linux, try to run the build
+        print("🚀 Starting Apptainer build...")
+        cmd = ["apptainer", "build", "--force", "--fakeroot", str(output_sif), str(target_path)]
+
+        try:
+            subprocess.run(cmd, check=True)
+            print(f"✅ Success! Image built at: {output_sif}")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Build failed. Make sure 'apptainer' is in your pixi dependencies.")
+            sys.exit(e.returncode)
+        finally:
+            # Cleanup
+            if tmp_dir.exists():
+                shutil.rmtree(tmp_dir)
+
+    else:
+        # On Windows/MacOS
+        print(f"✅ Definition file created at: {target_path}")
+        print("⚠️  You are on " + sys.platform + ". Apptainer builds require Linux.")
+        print("📋 To build the image, copy this folder to a Linux machine (or WSL) and run:")
+        print(f"   apptainer build pixitainer.sif {target_path.name}")
+        # We do NOT remove tmp_dir here so the user can access the .def file
+
+
+if __name__ == "__main__":
+    main()
