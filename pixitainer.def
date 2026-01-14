@@ -26,7 +26,7 @@ From: ubuntu:24.04
 
     echo "Installing project environment..."
     # We use --frozen to ensure it perfectly matches the lockfile
-    pixi install --frozen
+    pixi install -a --frozen
 
     # 4. Cleanup to reduce image size
     apt-get remove -y curl
