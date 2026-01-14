@@ -35,5 +35,4 @@ From: ubuntu:24.04
     rm -rf /var/lib/apt/lists/*
 
 %runscript
-    # cd /app
     {{ RUNSCRIPT_CONTENT }}

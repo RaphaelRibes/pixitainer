@@ -15,16 +15,37 @@ Here I have an example of use of `pixitainer.def` for a [DNA assembler project](
 
 TODO:
 - [x] Receipe that works.
-- [ ] Pixi package that I can add as a plugin.
+- [x] Pixi package that I can add as a plugin.
 - [ ] Adding options to the plugin.
 - [ ] Modular receipe ?
 - [ ] Publish and go back to step 3 until WW3, messia'h or death of the internet
 
-# Common problem
+# How to install (dev)
+> WARNING! This is a very early version of pixitainer, use at your own risk !
 
-> ERROR  : Failed to create mount namespace: mount namespace requires privileges, check Apptainer installation
+0. Install pixi
+```bash
+curl -fsSL https://pixi.sh/install.sh | sh
+```
 
-This problems appears on ubuntu systems, you have to check 2 things:
+1. Install rattler
+```bash
+pixi global install rattler-build
+```
 
-- If `sysctl kernel.unprivileged_userns_clone` returns `kernel.unprivileged_userns_clone = 0`, type `sudo sysctl -w kernel.unprivileged_userns_clone=1`
-- If `sysctl kernel.apparmor_restrict_unprivileged_userns` returns `kernel.apparmor_restrict_unprivileged_userns = 1`, type `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`
+2. Clone this repo
+```bash
+git clone https://github.com/RaphaelRibes/pixitainer.git
+cd pixitainer
+```
+
+3. Build the pixitainer plugin
+```bash
+rattler-build build --recipe recipe.yaml --output-dir ./output
+```
+
+4. Install the pixitainer plugin
+```bash
+pixi global install pixitainer --channel ./output --channel conda-forge
+```
+

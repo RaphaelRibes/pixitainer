@@ -1,0 +1,30 @@
+context:
+  name: pixitainer
+  version: 0.1.0
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  path: .
+
+build:
+  number: 0
+  noarch: python
+  script:
+    - mkdir -p $PREFIX/bin
+    - cp pixi-containerize $PREFIX/bin/pixi-containerize
+    - chmod +x $PREFIX/bin/pixi-containerize
+
+requirements:
+  host:
+    - python >=3.11
+  run:
+    - python >=3.11
+    - apptainer >=1.4.5
+
+about:
+  summary: A Pixi extension to containerize projects
+  license: BSD-3-Clause
+  homepage: https://github.com/raphaelribes/pixitainer
