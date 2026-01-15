@@ -1,0 +1,5 @@
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+.idea/
+*.sif

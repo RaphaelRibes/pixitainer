@@ -16,6 +16,7 @@ From: ubuntu:24.04
 %environment
     # Set the path to the global Pixi installation
     export PIXI_HOME=/opt/pixi
+    export PIXI_PROJECT_MANIFEST=/opt/conf/pixi.toml
     export PATH="/opt/pixi/bin:$PATH"
     export PIXI_CACHE_DIR=/tmp/pixi_cache
     export PIXI_FROZEN=true
@@ -46,20 +47,20 @@ From: ubuntu:24.04
     rm -rf /var/lib/apt/lists/*
 
 %runscript
-    eval "$(pixi shell-hook --shell sh --as-is --manifest-path /opt/conf/pixi.toml)"
+    # pixi shell-hook --shell bash --as-is --manifest-path /opt/conf/pixi.toml
     {{ RUNSCRIPT_CONTENT }}
 """
 
 
 def main():
     parser = argparse.ArgumentParser(description="Pixi extension to containerize a project with Apptainer")
-    parser.add_argument("--wd", default=".", help="Working directory")
-    parser.add_argument("--seamless", action="store_true", help="Enable seamless execution")
+    parser.add_argument("-p", "--path", default=".", help="Working directory")
+    parser.add_argument("-s", "--seamless", action="store_true", help="Enable seamless execution")
     parser.add_argument("-e", "--environment", action="append", help="Specific environment(s) to install")
     args = parser.parse_args()
 
     # Resolve paths
-    wd = Path(args.wd).resolve()
+    wd = Path(args.path).resolve()
     tmp_dir = wd / ".tmp_pixitainer"
 
     # Check for project files
@@ -89,13 +90,14 @@ def main():
         install_cmd = "pixi install -a --frozen"
 
     # Seamless logic
-    runscript_content = 'exec pixi run --as-is "$@"' if args.seamless else 'exec "$@"'
+    runscript_content = 'pixi run --as-is "$@"' if args.seamless else 'exec "$@"'
 
     # Write the template
     content = TEMPLATE_CONTENT
     content = content.replace("{{ FILES_SECTION }}", files_section)
     content = content.replace("{{ RUNSCRIPT_CONTENT }}", runscript_content)
     content = content.replace("{{ INSTALL_COMMAND }}", install_cmd)
+
     target_path.write_text(content, encoding="utf-8")
 
     output_sif = wd / "pixitainer.sif"

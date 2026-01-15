@@ -15,10 +15,11 @@ Here I have an example of use of `pixitainer.def` for a [DNA assembler project](
 
 TODO:
 - [x] Receipe that works.
-- [x] Pixi package that I can add as a plugin.
-- [ ] Adding options to the plugin.
-- [ ] Modular receipe ?
-- [ ] Publish and go back to step 3 until WW3, messia'h or death of the internet
+- [x] Pixi package that I can add as a extension.
+- [x] Adding options to the extension.
+- [ ] Documentation and testings.
+- [ ] Publish
+- [ ] Go back to step 3 until WW3, messia'h or death of the internet
 
 # How to install (dev)
 > WARNING! This is a very early version of pixitainer, use at your own risk !
@@ -39,13 +40,18 @@ git clone https://github.com/RaphaelRibes/pixitainer.git
 cd pixitainer
 ```
 
-3. Build the pixitainer plugin
+3. Install rattler
 ```bash
-rattler-build build --recipe recipe.yaml --output-dir ./output
+pixi global install rattler-build
 ```
 
-4. Install the pixitainer plugin
+4. Build the pixitainer extension
 ```bash
-pixi global install pixitainer --channel ./output --channel conda-forge
+rattler-build build --recipe recipe.yaml --output-dir $(pwd -P)/output
+```
+
+5. Install the pixitainer extension
+```bash
+pixi global install pixitainer --channel $(pwd -P)/output --channel conda-forge
 ```
 
