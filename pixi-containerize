@@ -17,6 +17,8 @@ From: ubuntu:24.04
     # Set the path to the global Pixi installation
     export PIXI_HOME=/opt/pixi
     export PATH="/opt/pixi/bin:$PATH"
+    export PIXI_CACHE_DIR=/tmp/pixi_cache
+    export PIXI_FROZEN=true
 
 %post
     export DEBIAN_FRONTEND=noninteractive
@@ -30,16 +32,12 @@ From: ubuntu:24.04
     export PATH="/opt/pixi/bin:$PATH"
 
     # 3. Setup the Project Environment
-    mkdir -p /app
-    cd /app
+    mkdir -p /opt/conf
+    cd /opt/conf
 
     echo "Installing project environment..."
-    # We use --frozen to ensure it perfectly matches the lockfile
-    if [ -f pixi.lock ]; then
-        pixi install --frozen
-    else
-        pixi install
-    fi
+    pixi config set --local run-post-link-scripts insecure
+    {{ INSTALL_COMMAND }}
 
     # 4. Cleanup to reduce image size
     apt-get remove -y curl
@@ -48,7 +46,7 @@ From: ubuntu:24.04
     rm -rf /var/lib/apt/lists/*
 
 %runscript
-    # cd /app
+    eval "$(pixi shell-hook --shell sh --as-is --manifest-path /opt/conf/pixi.toml)"
     {{ RUNSCRIPT_CONTENT }}
 """
 
@@ -57,6 +55,7 @@ def main():
     parser = argparse.ArgumentParser(description="Pixi extension to containerize a project with Apptainer")
     parser.add_argument("--wd", default=".", help="Working directory")
     parser.add_argument("--seamless", action="store_true", help="Enable seamless execution")
+    parser.add_argument("-e", "--environment", action="append", help="Specific environment(s) to install")
     args = parser.parse_args()
 
     # Resolve paths
@@ -79,17 +78,24 @@ def main():
 
     # Prepare %files section
     # Using .as_posix() ensures paths are compatible even if generated on Windows
-    files_section = f'    "{pixi_toml.as_posix()}" /app/pixi.toml\n'
-    if pixi_lock.exists():
-        files_section += f'    "{pixi_lock.as_posix()}" /app/pixi.lock'
+    files_section = f'    "{pixi_toml.as_posix()}" /opt/conf/pixi.toml\n'
+    files_section += f'    "{pixi_lock.as_posix()}" /opt/conf/pixi.lock'
+
+    if args.environment:
+        # Build string like: pixi install -e env1 -e env2 --frozen
+        env_flags = " ".join([f"-e {e}" for e in args.environment])
+        install_cmd = f"pixi install {env_flags} --frozen"
+    else:
+        install_cmd = "pixi install -a --frozen"
 
     # Seamless logic
-    runscript_content = 'exec pixi run "$@"' if args.seamless else 'exec "$@"'
+    runscript_content = 'exec pixi run --as-is "$@"' if args.seamless else 'exec "$@"'
 
     # Write the template
     content = TEMPLATE_CONTENT
     content = content.replace("{{ FILES_SECTION }}", files_section)
     content = content.replace("{{ RUNSCRIPT_CONTENT }}", runscript_content)
+    content = content.replace("{{ INSTALL_COMMAND }}", install_cmd)
     target_path.write_text(content, encoding="utf-8")
 
     output_sif = wd / "pixitainer.sif"
