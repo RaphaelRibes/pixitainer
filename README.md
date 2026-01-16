@@ -1,12 +1,24 @@
 # Pixitainer
 
-Pixi is cool, apptainer is cool, let's make them both work togerther !
+Pixi is cool, Apptainer is cool, let's make them both work together !
 
-## Why ?
+## Why ...
 
-Singularity/apptainer is very used in bioinformatics, it's at the hearth of analyses pipelines, but it's a headache to put in place.
-In another hand, pixi is fast, easy to use but it's not a container and so harder to keep intact for a long period of time.
-The idea behind pixitainer is to put a pixi environment into a apptainer container, so you can freeze your fast pace working environment into a container easily !
+### pixi ?
+
+Pixi is a fast, easy and fun to use tool that allows you to manage multiple dependencies in multiple environment very easily.
+It has a great support either by its developers or community on [discord](https://discord.gg/A94bgPENFD).
+
+### using containers ?
+
+Singularity/Apptainer is very used in bioinformatics, it's at the hearth of analyzes pipelines, but it's a headache to put in place.
+In another hand, pixi is fast, easy to use, but it's not a container and so harder to keep intact for a long period of time.
+The idea behind pixitainer is to put a pixi environment into an Apptainer container, so you can freeze your fast pace working environment into a container easily !
+
+### Apptainer ?
+
+Apptainer is more the "public library" version of the software, while Singularity is more like a "corporate bookstore."
+Because Apptainer is hosted by the Linux Foundation, it is designed specifically for the scientific community to ensure that your research code remains free, accessible and without being tied to a private company’s profit goals.
 
 ## How ?
 The best thing to do will be to add this way as a [pixi extension](https://pixi.sh/latest/integration/extensions/introduction/), so we just have to type `pixi container` and some option and tada !
@@ -15,7 +27,7 @@ Here I have an example of use of `pixitainer.def` for a [DNA assembler project](
 
 TODO:
 - [x] Receipe that works.
-- [x] Pixi package that I can add as a extension.
+- [x] Pixi package that I can add as an extension.
 - [x] Adding options to the extension.
 - [ ] Documentation and testings.
 - [ ] Publish
