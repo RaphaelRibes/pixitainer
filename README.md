@@ -40,17 +40,12 @@ git clone https://github.com/RaphaelRibes/pixitainer.git
 cd pixitainer
 ```
 
-3. Install rattler
-```bash
-pixi global install rattler-build
-```
-
-4. Build the pixitainer extension
+3. Build the pixitainer extension
 ```bash
 rattler-build build --recipe recipe.yaml --output-dir $(pwd -P)/output
 ```
 
-5. Install the pixitainer extension
+4. Install the pixitainer extension
 ```bash
 pixi global install pixitainer --channel $(pwd -P)/output --channel conda-forge
 ```
