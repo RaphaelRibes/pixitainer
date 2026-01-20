@@ -23,7 +23,7 @@ Because Apptainer is hosted by the Linux Foundation, it is designed specifically
 ## How ?
 The best thing to do will be to add this way as a [pixi extension](https://pixi.sh/latest/integration/extensions/introduction/), so we just have to type `pixi container` and some option and tada !
 For now, there is the `pixitainer.def` with ideas how to make it work.
-Here I have an example of use of `pixitainer.def` for a [DNA assembler project](https://github.com/MickaelCQ/RaMiLass.git) during my master.
+Here I have an example of use of `pixitainer.def` for a [short reads assembler project](https://github.com/MickaelCQ/RaMiLass.git) during my master.
 
 TODO:
 - [x] Receipe that works.
