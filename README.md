@@ -54,6 +54,7 @@ It's going to try to write in `/opt/conf` wich is not allowed because the sif im
 
 To fix it, replace your `mkdir test` byt `mkdir $INIT_CWD/test`.
 
+
 # How to install (dev)
 > WARNING! This is a very early version of pixitainer, use at your own risk !
 
@@ -61,6 +62,13 @@ To fix it, replace your `mkdir test` byt `mkdir $INIT_CWD/test`.
 ```bash
 curl -fsSL https://pixi.sh/install.sh | sh
 ```
+
+You have two way of using it, I recommend for now that you just add it to your path
+```bash
+export PATH=$PWD:$PATH
+```
+
+If you want to build it tho, do this:
 
 1. Install rattler
 ```bash
@@ -81,9 +89,4 @@ rattler-build build --recipe recipe.yaml --output-dir $(pwd -P)/output
 4. Install the pixitainer extension
 ```bash
 pixi global install pixitainer --channel $(pwd -P)/output --channel conda-forge
-```
-
-It's easier to use this for now
-```bash
-export PATH=$PWD:$PATH
 ```
