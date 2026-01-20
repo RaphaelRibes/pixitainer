@@ -63,6 +63,12 @@ However sometimes pixi may write something in its cache so don't hesitate to use
 curl -fsSL https://pixi.sh/install.sh | sh
 ```
 
+1. Clone this repo
+```bash
+git clone https://github.com/RaphaelRibes/pixitainer.git
+cd pixitainer
+```
+
 You have two way of using it, I recommend for now that you just add it to your path
 ```bash
 export PATH=$PWD:$PATH
@@ -75,18 +81,12 @@ If you want to build it tho, do this:
 pixi global install rattler-build
 ```
 
-2. Clone this repo
-```bash
-git clone https://github.com/RaphaelRibes/pixitainer.git
-cd pixitainer
-```
-
-3. Build the pixitainer extension
+2. Build the pixitainer extension
 ```bash
 rattler-build build --recipe recipe.yaml --output-dir $(pwd -P)/output
 ```
 
-4. Install the pixitainer extension
+3. Install the pixitainer extension
 ```bash
 pixi global install pixitainer --channel $(pwd -P)/output --channel conda-forge
 ```
