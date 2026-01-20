@@ -36,20 +36,23 @@ TODO:
 # Known problems
 
 ## Pathing is... strange?
-```bash
-┌─[tmp][]
-└─▪ apptainer exec --writable-tmpfs -f --bind $(pwd)/../.:$(pwd)/../. pixitainer.sif /bin/bash
-Apptainer> pixi run "echo \$INIT_CWD"
-/tmp
 
-┌─[tmp][]
-└─▪ apptainer run --writable-tmpfs -f --bind $(pwd)/../.:$(pwd)/../. pixitainer.sif pixi run "echo \$INIT_CWD"
-// It returns nothing
+When launching a command in the pixi shell, the `cwd` of tasks will be changed into the one of the pixi workplace (`PIXI_PROJECT_ROOT`).
 
-┌─[tmp][]
-└─▪ apptainer run pixitainer.sif pixi run "echo \$INIT_CWD"
-// It returns nothing
+Let's create a task
+```yaml
+[tasks]
+make_dir = 'mkdir testdir'
 ```
+If you run this task, it's going to create `$PIXI_PROJECT_ROOT/testdir` and not `$INIT_CWD/testdir`.
+What you want is to run pixi in the `INIT_CWD` so take the time to change your `./something` to `$INIT_CWD/something`.
+
+## Read-only file system (os error 30)
+
+This is related to the previous problem: pixi is using `PIXI_PROJECT_ROOT` as the `cwd`. 
+It's going to try to write in `/opt/conf` wich is not allowed because the sif image is in read only.
+
+To fix it, replace your `mkdir test` byt `mkdir $INIT_CWD/test`.
 
 # How to install (dev)
 > WARNING! This is a very early version of pixitainer, use at your own risk !

@@ -19,7 +19,6 @@ From: ubuntu:24.04
     export PIXI_PROJECT_MANIFEST=/opt/conf/pixi.toml
     export PATH="/opt/pixi/bin:$PATH"
     export PIXI_CACHE_DIR=/tmp/pixi_cache
-    export PIXI_FROZEN=true
 
 %post
     export DEBIAN_FRONTEND=noninteractive
@@ -45,10 +44,6 @@ From: ubuntu:24.04
     apt-get autoremove -y
     apt-get clean
     rm -rf /var/lib/apt/lists/*
-
-%runscript
-    # pixi shell-hook --shell bash --as-is --manifest-path /opt/conf/pixi.toml
-    {{ RUNSCRIPT_CONTENT }}
 """
 
 
@@ -90,7 +85,7 @@ def main():
         install_cmd = "pixi install -a --frozen"
 
     # Seamless logic
-    runscript_content = 'pixi run --as-is "$@"' if args.seamless else 'exec "$@"'
+    runscript_content = 'pixi run --as-is -m /opt/conf/pixi.toml "$@"' if args.seamless else 'exec "$@"'
 
     # Write the template
     content = TEMPLATE_CONTENT
