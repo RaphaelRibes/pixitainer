@@ -51,9 +51,9 @@ What you want is to run pixi in the `INIT_CWD` so take the time to change your `
 
 This is related to the previous problem: pixi is using `PIXI_PROJECT_ROOT` as the `cwd`. 
 It's going to try to write in `/opt/conf` wich is not allowed because the sif image is in read only.
-
 To fix it, replace your `mkdir test` byt `mkdir $INIT_CWD/test`.
 
+However sometimes pixi may write something in its cache so don't hesitate to use `--writable-tmpfs`.
 
 # How to install (dev)
 > WARNING! This is a very early version of pixitainer, use at your own risk !
@@ -90,3 +90,47 @@ rattler-build build --recipe recipe.yaml --output-dir $(pwd -P)/output
 ```bash
 pixi global install pixitainer --channel $(pwd -P)/output --channel conda-forge
 ```
+
+# How to use
+
+You actually have two ways of using pixitainer:
+1. Manually
+2. Seamlessly
+
+We put ourselves in an environment with one task defined like
+```yaml
+[tasks]
+make_dir = 'mkdir testdir'
+```
+
+## Manually
+You can also build the container manually with apptainer
+```bash
+pixi containerize
+```
+
+Then you can use pixi in your image
+```bash
+apptainer run -f pixitainer.sif pixi run --as-is -m /opt/conf/pixi.toml make_dir
+```
+
+We add `--as-is` to make sure it sticks to the `pixi.lock` file and it only uses the installed binaries and doesn't try to install others.
+
+> **WARNING**: `-m /opt/conf/pixi.toml` is mandatory or pixi will use the default one in your current working directory.
+
+## Seamlessly
+Just use the pixitainer extension command after installing it with the seamless option (`-s`, `--seamless`).
+```bash
+pixi containerize -s
+```
+
+You can then tun your task like pixi is not even here
+```bash
+apptainer run -f pixitainer.sif make_dir
+```
+
+> **WARNING**: the seamless mode makes that every commands run through the image are ran like so
+> ```bash
+> pixi run --as-is -m /opt/conf/pixi.toml "$@"
+> ```
+> Meaning that you only have access to `pixi run` and nothing else.
