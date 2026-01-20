@@ -44,7 +44,7 @@ Let's create a task
 [tasks]
 make_dir = 'mkdir testdir'
 ```
-If you run this task, it's going to create `$PIXI_PROJECT_ROOT/testdir` and not `$INIT_CWD/testdir`.
+If you run this task, it's going to create `$PIXI_PROJECT_ROOT/testdir` (`/opt/conf/testdir`) and not `$INIT_CWD/testdir` (`$(pwd)/testdir`).
 What you want is to run pixi in the `INIT_CWD` so take the time to change your `./something` to `$INIT_CWD/something`.
 
 ## Read-only file system (os error 30)
