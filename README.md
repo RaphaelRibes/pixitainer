@@ -31,7 +31,25 @@ TODO:
 - [x] Adding options to the extension.
 - [ ] Documentation and testings.
 - [ ] Publish
-- [ ] Go back to step 3 until WW3, messia'h or death of the internet
+- [ ] Go back to step 3 until WW3, messiah or death of the internet
+
+# Known problems
+
+## Pathing is... strange?
+```bash
+┌─[tmp][]
+└─▪ apptainer exec --writable-tmpfs -f --bind $(pwd)/../.:$(pwd)/../. pixitainer.sif /bin/bash
+Apptainer> pixi run "echo \$INIT_CWD"
+/tmp
+
+┌─[tmp][]
+└─▪ apptainer run --writable-tmpfs -f --bind $(pwd)/../.:$(pwd)/../. pixitainer.sif pixi run "echo \$INIT_CWD"
+// It returns nothing
+
+┌─[tmp][]
+└─▪ apptainer run pixitainer.sif pixi run "echo \$INIT_CWD"
+// It returns nothing
+```
 
 # How to install (dev)
 > WARNING! This is a very early version of pixitainer, use at your own risk !
@@ -62,3 +80,7 @@ rattler-build build --recipe recipe.yaml --output-dir $(pwd -P)/output
 pixi global install pixitainer --channel $(pwd -P)/output --channel conda-forge
 ```
 
+It's easier to use this for now
+```bash
+export PATH=$PWD:$PATH
+```
