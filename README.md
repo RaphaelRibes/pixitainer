@@ -29,6 +29,18 @@ TODO:
 - [x] Receipe that works.
 - [x] Pixi package that I can add as an extension.
 - [x] Adding options to the extension.
+  - [ ] Build options
+    - [x] Seamless mode (`-s`, `--seamless`)
+    - [x] Specific environment selection (`-e`, `--env`)
+    - [ ] Specify base image (`--base-image`)
+    - [ ] Specify pixi version (`--pixi-version`)
+    - [ ] Export the `.def` file (`--keep-def`)
+    - [ ] Verbose mode (`--verbose`)
+- [ ] Support of container solutions 
+   - [x] Apptainer
+   - [ ] Docker
+   - [ ] Singularity
+    > Note that by default pixitainer is made with Apptainer in mind so it will be an option to install other container solutions.
 - [ ] Documentation and testings.
 - [ ] Publish
 - [ ] Go back to step 3 until WW3, messiah or death of the internet

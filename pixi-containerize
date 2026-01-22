@@ -14,11 +14,9 @@ From: ubuntu:24.04
     {{ FILES_SECTION }}
 
 %environment
-    # Set the path to the global Pixi installation
     export PIXI_HOME=/opt/pixi
     export PIXI_PROJECT_MANIFEST=/opt/conf/pixi.toml
     export PATH="/opt/pixi/bin:$PATH"
-    export PIXI_CACHE_DIR=/tmp/pixi_cache
 
 %post
     export DEBIAN_FRONTEND=noninteractive
@@ -54,7 +52,7 @@ def main():
     parser = argparse.ArgumentParser(description="Pixi extension to containerize a project with Apptainer")
     parser.add_argument("-p", "--path", default=".", help="Working directory")
     parser.add_argument("-s", "--seamless", action="store_true", help="Enable seamless execution")
-    parser.add_argument("-e", "--environment", action="append", help="Specific environment(s) to install")
+    parser.add_argument("-e", "--env", action="append", help="Specific environment(s) to install")
     args = parser.parse_args()
 
     # Resolve paths
@@ -80,9 +78,9 @@ def main():
     files_section = f'    "{pixi_toml.as_posix()}" /opt/conf/pixi.toml\n'
     files_section += f'    "{pixi_lock.as_posix()}" /opt/conf/pixi.lock'
 
-    if args.environment:
+    if args.env:
         # Build string like: pixi install -e env1 -e env2 --frozen
-        env_flags = " ".join([f"-e {e}" for e in args.environment])
+        env_flags = " ".join([f"-e {e}" for e in args.env])
         install_cmd = f"pixi install {env_flags} --frozen"
     else:
         install_cmd = "pixi install -a --frozen"
