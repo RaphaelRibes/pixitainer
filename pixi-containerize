@@ -6,9 +6,8 @@ import shutil
 from pathlib import Path
 
 # --- EMBEDDED TEMPLATE ---
-# This ensures the extension works anywhere without needing the .def file present
 TEMPLATE_CONTENT = """Bootstrap: docker
-From: ubuntu:24.04
+From: {{ BASE_IMAGE }}
 
 %files
     {{ FILES_SECTION }}
@@ -27,6 +26,8 @@ From: ubuntu:24.04
     # 2. Install Pixi globally to /opt/pixi (instead of /root)
     export PIXI_HOME=/opt/pixi
     curl -fsSL https://pixi.sh/install.sh | bash
+    {{ PIXI_VERSION_ENV }}
+  
     export PATH="/opt/pixi/bin:$PATH"
 
     # 3. Setup the Project Environment
@@ -46,13 +47,22 @@ From: ubuntu:24.04
 %runscript
     {{ RUNSCRIPT_CONTENT }}
 """
+# --- HARD-CODED PIXI VERSION ---
+PIXI_VERSIONS = ['0.63.2', '0.63.1', '0.63.0', '0.62.2', '0.62.1', '0.62.0', '0.61.0', '0.60.0', '0.59.0', '0.58.0', '0.57.0', '0.56.0', '0.55.0', '0.54.2', '0.54.1', '0.54.0', '0.53.0', '0.52.0', '0.51.0', '0.50.2', '0.50.1', '0.50.0', '0.49.0', '0.48.2', '0.48.1', '0.48.0', '0.47.0', '0.46.0', '0.45.0', '0.44.0', '0.43.3', '0.43.2', '0.43.1', '0.43.0', '0.42.1', '0.42.0', '0.41.4', '0.41.3', '0.41.2', '0.41.1', '0.41.0', '0.40.3', '0.40.2', '0.40.1', '0.40.0', '0.39.5', '0.39.4', '0.39.3', '0.39.2', '0.39.2-prerelease.2', '0.39.2-prerelease.0', '0.39.1', '0.39.0', '0.38.0', '0.37.0', '0.36.0', '0.35.0', '0.34.0', '0.33.0', '0.33.0rc1', '0.32.2', '0.32.1', '0.32.0', '0.31.0', '0.30.0', '0.29.0', '0.28.2', '0.28.1', '0.28.0', '0.27.1', '0.27.0', '0.26.1', '0.26.0', '0.25.0', '0.24.2', '0.24.1', '0.24.0', '0.23.0', '0.22.0', '0.21.1', '0.21.0', '0.20.1', '0.20.0', '0.19.1', '0.19.0', '0.18.0', '0.17.1', '0.17.0', '0.16.1', '0.16.0', '0.15.2', '0.15.1', '0.15.0', '0.14.0', '0.13.0', '0.12.0', '0.11.1', '0.11.0', '0.10.0', '0.9.1', '0.9.0', '0.8.0', '0.7.0', '0.6.0', '0.5.0', '0.4.0', '0.3.0', '0.2.0', '0.1.0', '0.0.8', '0.0.7', '0.0.6', '0.0.5', '0.0.4', '0.0.3', '0.0.2', '0.0.1']
+# I have to find a better way, but it takes a good second to fetch them all, so I prefer it hard-coded for now.
 
 
 def main():
     parser = argparse.ArgumentParser(description="Pixi extension to containerize a project with Apptainer")
+    parser.add_argument("-o", "--output", default="pixitainer", help="Output image file (default: pixitainer.sif in working directory)")
     parser.add_argument("-p", "--path", default=".", help="Working directory")
     parser.add_argument("-s", "--seamless", action="store_true", help="Enable seamless execution")
     parser.add_argument("-e", "--env", action="append", help="Specific environment(s) to install")
+    parser.add_argument("--base-image", default="ubuntu:24.04", help="Specify base image (default: ubuntu:24.04)")
+    parser.add_argument("--pixi-version", default="", help="Specify pixi version (default: latest)")
+    parser.add_argument("--keep-def", action="store_true", help="Export the .def file (do not delete temporary files)")
+    parser.add_argument("--verbose", action="store_true", help="Verbose mode (show full Apptainer build output)")
+
     args = parser.parse_args()
 
     # Resolve paths
@@ -79,7 +89,7 @@ def main():
     files_section += f'    "{pixi_lock.as_posix()}" /opt/conf/pixi.lock'
 
     if args.env:
-        # Build string like: pixi install -e env1 -e env2 --frozen
+        # Build string like: pixi install -e env1 -e env2 --frozen [cite: 5]
         env_flags = " ".join([f"-e {e}" for e in args.env])
         install_cmd = f"pixi install {env_flags} --frozen"
     else:
@@ -88,15 +98,27 @@ def main():
     # Seamless logic
     runscript_content = 'pixi run --as-is -m /opt/conf/pixi.toml "$@"' if args.seamless else 'exec "$@"'
 
+    # Handle Pixi Version
+    pixi_version = ""
+    if args.pixi_version:
+        if args.pixi_version not in PIXI_VERSIONS:
+            print(f"Error: Specified Pixi version '{args.pixi_version}' is not recognized.")
+            print("Available versions are:")
+            print(", ".join(PIXI_VERSIONS))
+            sys.exit(1)
+        pixi_version = f"pixi self-update --version {args.pixi_version}"
+
     # Write the template
     content = TEMPLATE_CONTENT
     content = content.replace("{{ FILES_SECTION }}", files_section)
     content = content.replace("{{ RUNSCRIPT_CONTENT }}", runscript_content)
     content = content.replace("{{ INSTALL_COMMAND }}", install_cmd)
+    content = content.replace("{{ BASE_IMAGE }}", args.base_image)
+    content = content.replace("{{ PIXI_VERSION_ENV }}", pixi_version)
 
     target_path.write_text(content, encoding="utf-8")
 
-    output_sif = wd / "pixitainer.sif"
+    output_sif = wd / f"{args.output}.sif"
 
     # Platform specific logic
     if sys.platform == "linux":
@@ -105,24 +127,43 @@ def main():
         cmd = ["apptainer", "build", "--force", "--fakeroot", str(output_sif), str(target_path)]
 
         try:
-            subprocess.run(cmd, check=True)
+            # If verbose is False, we capture output to keep it clean.
+            # If True, we let it flow to stdout/stderr.
+            capture = not args.verbose
+
+            subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.PIPE if capture else None,
+                stderr=subprocess.PIPE if capture else None
+            )
+
             print(f"✅ Success! Image built at: {output_sif}")
+
         except subprocess.CalledProcessError as e:
-            print(f"❌ Build failed. Make sure 'apptainer' is in your pixi dependencies.")
+            print(f"❌ Build failed.")
+            if not args.verbose:
+                # If we were capturing, print the error now so the user sees what happened
+                print("\n--- STDERR ---")
+                print(e.stderr.decode('utf-8', errors='replace'))
             sys.exit(e.returncode)
         finally:
-            # Cleanup
-            if tmp_dir.exists():
+            # Cleanup only if keep-def is NOT requested
+            if args.keep_def:
+                 print(f"ℹ️  Definition file kept at: {target_path}")
+            elif tmp_dir.exists():
                 shutil.rmtree(tmp_dir)
 
     else:
         # On Windows/MacOS
         print(f"✅ Definition file created at: {target_path}")
         print("⚠️  You are on " + sys.platform + ". Apptainer builds require Linux.")
-        print("📋 To build the image, copy this folder to a Linux machine (or WSL) and run:")
+        print("ℹ️ To build the image, copy this folder to a Linux machine (or WSL) and run:")
         print(f"   apptainer build pixitainer.sif {target_path.name}")
-        # We do NOT remove tmp_dir here so the user can access the .def file
 
+        # We do NOT remove tmp_dir here regardless of flag so the user can access the .def file [cite: 10]
+        if not args.keep_def:
+             print("ℹ️  Note: Use --keep-def on Linux to preserve this file automatically.")
 
 if __name__ == "__main__":
     main()
