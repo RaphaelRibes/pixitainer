@@ -30,13 +30,13 @@ TODO:
 - [x] Receipe that works.
 - [x] Pixi package that I can add as an extension.
 - [x] Adding options to the extension.
-  - [ ] Build options
+  - [x] Build options
     - [x] Seamless mode (`-s`, `--seamless`)
     - [x] Specific environment selection (`-e`, `--env`)
-    - [ ] Specify base image (`--base-image`)
-    - [ ] Specify pixi version (`--pixi-version`)
-    - [ ] Export the `.def` file (`--keep-def`)
-    - [ ] Verbose mode (`--verbose`)
+    - [x] Specify base image (`--base-image`)
+    - [x] Specify pixi version (`--pixi-version`)
+    - [x] Export the `.def` file (`--keep-def`)
+    - [x] Verbose mode (`--verbose`)
 - [ ] Support of container solutions 
    - [x] Apptainer
    - [ ] Docker
