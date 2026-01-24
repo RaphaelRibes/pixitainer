@@ -8,7 +8,7 @@ rm -f "$IMAGE_NAME"
 
 # RaMiLass has a 'default' environment. We test explicitly selecting it.
 echo "Testing --env option..."
-$PIXI_CMD -o env_test -e default
+$PIXI_CMD -o "$IMAGE_NAME" -e default
 
 if [ ! -f "$IMAGE_NAME" ]; then
     echo "Error: $IMAGE_NAME not found."
@@ -17,4 +17,4 @@ fi
 
 # Verification
 echo "Verifying env image..."
-pixi run -m "$(pwd -P)"/../../pixi.toml apptainer run "$IMAGE_NAME" pixi run --as-is -m /opt/conf/pixi.toml "echo \$(pixi -V)"
+pixi run -m ../../../pixi.toml apptainer run "$IMAGE_NAME" pixi run --as-is -m /opt/conf/pixi.toml "echo \$(pixi -V)"
