@@ -2,10 +2,10 @@
 channels = ["conda-forge"]
 name = "pixitainer"
 platforms = ["linux-64"]
-version = "0.2.2"
+version = "0.3.0"
 
 [tasks]
-containerize = "python -s pixi-containerize.py $@"
+containerize = "bash pixi-containerize $@"
 hello = "echo 'Hello, Pixitainer!'"
 
 [dependencies]
