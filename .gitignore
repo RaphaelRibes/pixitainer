@@ -3,3 +3,4 @@
 !.pixi/config.toml
 .idea/
 *.sif
+tests/RaMiLass/
