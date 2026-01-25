@@ -24,9 +24,7 @@ Apptainer is more the "public library" version of the software, while Singularit
 Because Apptainer is hosted by the Linux Foundation, it is designed specifically for the scientific community to ensure that your research code remains free, accessible and without being tied to a private company’s profit goals.
 
 ## How ?
-The best thing to do will be to add this way as a [pixi extension](https://pixi.sh/latest/integration/extensions/introduction/), so we just have to type `pixi container` and some option and tada !
-For now, there is the `pixitainer.def` with ideas how to make it work.
-Here I have an example of use of `pixitainer.def` for a [short reads assembler project](https://github.com/MickaelCQ/RaMiLass.git) during my master.
+The best thing to do will be to add this way as a [pixi extension](https://pixi.sh/latest/integration/extensions/introduction/), so we just have to type `pixi containerize`, some option and tada !
 
 TODO:
 - [x] Receipe that works.
@@ -47,28 +45,6 @@ TODO:
 - [x] Testings.
 - [x] Publish
 - [ ] Go back to step 3 until WW3, messiah or death of the internet
-
-# Known problems
-
-## Pathing is... strange?
-
-When launching a command in the pixi shell, the `cwd` of tasks will be changed into the one of the pixi workplace (`PIXI_PROJECT_ROOT`).
-
-Let's create a task
-```yaml
-[tasks]
-make_dir = 'mkdir testdir'
-```
-If you run this task, it's going to create `$PIXI_PROJECT_ROOT/testdir` (`/opt/conf/testdir`) and not `$INIT_CWD/testdir` (`$(pwd)/testdir`).
-What you want is to run pixi in the `INIT_CWD` so take the time to change your `./something` to `$INIT_CWD/something`.
-
-## Read-only file system (os error 30)
-
-This is related to the previous problem: pixi is using `PIXI_PROJECT_ROOT` as the `cwd`. 
-It's going to try to write in `/opt/conf` wich is not allowed because the sif image is in read only.
-To fix it, replace your `mkdir test` byt `mkdir $INIT_CWD/test`.
-
-However, sometimes pixi may write something in its cache so don't hesitate to use `--writable-tmpfs`.
 
 # How to install
 0. Install pixi
@@ -154,3 +130,26 @@ apptainer run -f pixitainer.sif make_dir
 > pixi run --as-is -m /opt/conf/pixi.toml "$@"
 > ```
 > Meaning that you only have access to `pixi run` and nothing else.
+
+
+# Known problems
+
+## Pathing is... strange?
+
+When launching a command in the pixi shell, the `cwd` of tasks will be changed into the one of the pixi workplace (`PIXI_PROJECT_ROOT`).
+
+Let's create a task
+```yaml
+[tasks]
+make_dir = 'mkdir testdir'
+```
+If you run this task, it's going to create `$PIXI_PROJECT_ROOT/testdir` (`/opt/conf/testdir`) and not `$INIT_CWD/testdir` (`$(pwd)/testdir`).
+What you want is to run pixi in the `INIT_CWD` so take the time to change your `./something` to `$INIT_CWD/something`.
+
+## Read-only file system (os error 30)
+
+This is related to the previous problem: pixi is using `PIXI_PROJECT_ROOT` as the `cwd`. 
+It's going to try to write in `/opt/conf` wich is not allowed because the sif image is in read only.
+To fix it, replace your `mkdir test` byt `mkdir $INIT_CWD/test`.
+
+However, sometimes pixi may write something in its cache so don't hesitate to use `--writable-tmpfs`.
