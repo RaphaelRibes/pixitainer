@@ -1,22 +1,155 @@
-#!/usr/bin/env python3
-import argparse
-import subprocess
-import sys
-import shutil
-import time
-from pathlib import Path
+#!/bin/bash
+set -e
 
-# --- EMBEDDED TEMPLATE ---
-TEMPLATE_CONTENT = """Bootstrap: docker
-From: {{ BASE_IMAGE }}
+# --- Valeurs par défaut ---
+OUTPUT="pixitainer.sif"
+PROJECT_PATH="."
+SEAMLESS=false
+BASE_IMAGE="ubuntu:24.04"
+TARGET_PIXI_VERSION=""
+KEEP_DEF=false
+VERBOSE=false
+declare -a ENVS
+
+# --- Fonction d'aide ---
+usage() {
+    echo "Usage: $0 [options]"
+    echo ""
+    echo "Pixi extension to containerize a project with Apptainer"
+    echo ""
+    echo "Options:"
+    echo "  -o, --output OUTPUT       Output image path (default: pixitainer.sif)"
+    echo "  -p, --path PATH           Working directory (source project)"
+    echo "  -s, --seamless            Enable seamless execution"
+    echo "  -e, --env ENV             Specific environment(s) to install (can be used multiple times)"
+    echo "  --base-image IMAGE        Specify base image (default: ubuntu:24.04)"
+    echo "  --pixi-version VERSION    Specify pixi version (default: latest)"
+    echo "  --keep-def                Export the .def file (do not delete temporary files)"
+    echo "  --verbose                 Verbose mode (show full Apptainer build output)"
+    echo "  -h, --help                Show this help message"
+}
+
+# --- Parsing des arguments ---
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -o|--output)
+            OUTPUT="$2"
+            shift 2
+            ;;
+        -p|--path)
+            PROJECT_PATH="$2"
+            shift 2
+            ;;
+        -s|--seamless)
+            SEAMLESS=true
+            shift
+            ;;
+        -e|--env)
+            ENVS+=("$2")
+            shift 2
+            ;;
+        --base-image)
+            BASE_IMAGE="$2"
+            shift 2
+            ;;
+        --pixi-version)
+            TARGET_PIXI_VERSION="$2"
+            shift 2
+            ;;
+        --keep-def)
+            KEEP_DEF=true
+            shift
+            ;;
+        --verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+# --- Résolution des chemins ---
+# On utilise cd + pwd pour obtenir le chemin absolu compatible Linux/macOS
+WD=$(cd "$PROJECT_PATH" && pwd)
+# Pour l'output, on gère le cas où le fichier n'existe pas encore
+OUTPUT_DIR=$(dirname "$OUTPUT")
+# Si output est relatif, on le rend absolu par rapport au dossier courant
+if [[ "$OUTPUT_DIR" == "." ]]; then
+    OUTPUT_ABS="$(pwd)/$OUTPUT"
+    OUTPUT_PARENT="$(pwd)"
+else
+    mkdir -p "$OUTPUT_DIR"
+    OUTPUT_ABS="$(cd "$OUTPUT_DIR" && pwd)/$(basename "$OUTPUT")"
+    OUTPUT_PARENT="$(cd "$OUTPUT_DIR" && pwd)"
+fi
+
+TMP_DIR="$OUTPUT_PARENT/.tmp_pixitainer"
+PIXI_TOML="$WD/pixi.toml"
+PIXI_LOCK="$WD/pixi.lock"
+
+# --- Vérifications ---
+if [ ! -f "$PIXI_TOML" ]; then
+    echo "Error: pixi.toml not found in $WD"
+    exit 1
+fi
+
+echo "📦 Containerizing project from: $WD"
+echo "📂 Output target: $OUTPUT_ABS"
+
+# --- Préparation du .def ---
+mkdir -p "$TMP_DIR"
+TARGET_DEF="$TMP_DIR/pixitainer.def"
+
+# Construction de la section %files
+FILES_SECTION="    \"$PIXI_TOML\" /opt/conf/pixi.toml"
+if [ -f "$PIXI_LOCK" ]; then
+    FILES_SECTION="$FILES_SECTION"$'\n'"    \"$PIXI_LOCK\" /opt/conf/pixi.lock"
+fi
+
+# Construction de la commande d'installation
+if [ ${#ENVS[@]} -gt 0 ]; then
+    ENV_FLAGS=""
+    for env in "${ENVS[@]}"; do
+        ENV_FLAGS="$ENV_FLAGS -e $env"
+    done
+    INSTALL_CMD="pixi install $ENV_FLAGS --frozen"
+else
+    INSTALL_CMD="pixi install -a --frozen"
+fi
+
+# Logique Seamless
+if [ "$SEAMLESS" = true ]; then
+    RUNSCRIPT_CONTENT='pixi run --as-is -m /opt/conf/pixi.toml "$@"'
+else
+    RUNSCRIPT_CONTENT='exec "$@"'
+fi
+
+# Gestion de la version de Pixi
+PIXI_VERSION_ENV=""
+if [ -n "$TARGET_PIXI_VERSION" ]; then
+    PIXI_VERSION_ENV="pixi self-update --version $TARGET_PIXI_VERSION"
+fi
+
+# Écriture du fichier de définition (Here-Doc)
+cat <<EOF > "$TARGET_DEF"
+Bootstrap: docker
+From: $BASE_IMAGE
 
 %files
-    {{ FILES_SECTION }}
+$FILES_SECTION
 
 %environment
     export PIXI_HOME=/opt/pixi
     export PIXI_PROJECT_MANIFEST=/opt/conf/pixi.toml
-    export PATH="/opt/pixi/bin:$PATH"
+    export PATH="/opt/pixi/bin:\$PATH"
 
 %post
     export DEBIAN_FRONTEND=noninteractive
@@ -24,147 +157,72 @@ From: {{ BASE_IMAGE }}
     # 1. Install system dependencies
     apt-get update && apt-get install -y curl
 
-    # 2. Install Pixi globally to /opt/pixi (instead of /root)
+    # 2. Install Pixi globally to /opt/pixi
     export PIXI_HOME=/opt/pixi
     curl -fsSL https://pixi.sh/install.sh | bash
-    export PATH="/opt/pixi/bin:$PATH"
+    export PATH="/opt/pixi/bin:\$PATH"
 
-    {{ PIXI_VERSION_ENV }}
-  
+    $PIXI_VERSION_ENV
+
     # 3. Setup the Project Environment
     mkdir -p /opt/conf
     cd /opt/conf
 
     echo "Installing project environment..."
     pixi config set --local run-post-link-scripts insecure
-    {{ INSTALL_COMMAND }}
+    $INSTALL_CMD
 
-    # 4. Cleanup to reduce image size
+    # 4. Cleanup
     apt-get remove -y curl
     apt-get autoremove -y
     apt-get clean
     rm -rf /var/lib/apt/lists/*
-    
+
 %runscript
-    {{ RUNSCRIPT_CONTENT }}
-"""
+    $RUNSCRIPT_CONTENT
+EOF
 
-# --- HARD-CODED PIXI VERSION ---
-PIXI_VERSIONS = ['0.63.2', '0.63.1', '0.63.0', '0.62.2', '0.62.1', '0.62.0', '0.61.0', '0.60.0', '0.59.0', '0.58.0', '0.57.0', '0.56.0', '0.55.0', '0.54.2', '0.54.1', '0.54.0', '0.53.0', '0.52.0', '0.51.0', '0.50.2', '0.50.1', '0.50.0', '0.49.0', '0.48.2', '0.48.1', '0.48.0', '0.47.0', '0.46.0', '0.45.0', '0.44.0', '0.43.3', '0.43.2', '0.43.1', '0.43.0', '0.42.1', '0.42.0', '0.41.4', '0.41.3', '0.41.2', '0.41.1', '0.41.0', '0.40.3', '0.40.2', '0.40.1', '0.40.0', '0.39.5', '0.39.4', '0.39.3', '0.39.2', '0.39.2-prerelease.2', '0.39.2-prerelease.0', '0.39.1', '0.39.0', '0.38.0', '0.37.0', '0.36.0', '0.35.0', '0.34.0', '0.33.0', '0.33.0rc1', '0.32.2', '0.32.1', '0.32.0', '0.31.0', '0.30.0', '0.29.0', '0.28.2', '0.28.1', '0.28.0', '0.27.1', '0.27.0', '0.26.1', '0.26.0', '0.25.0', '0.24.2', '0.24.1', '0.24.0', '0.23.0', '0.22.0', '0.21.1', '0.21.0', '0.20.1', '0.20.0', '0.19.1', '0.19.0', '0.18.0', '0.17.1', '0.17.0', '0.16.1', '0.16.0', '0.15.2', '0.15.1', '0.15.0', '0.14.0', '0.13.0', '0.12.0', '0.11.1', '0.11.0', '0.10.0', '0.9.1', '0.9.0', '0.8.0', '0.7.0', '0.6.0', '0.5.0', '0.4.0', '0.3.0', '0.2.0', '0.1.0', '0.0.8', '0.0.7', '0.0.6', '0.0.5', '0.0.4', '0.0.3', '0.0.2', '0.0.1']
-# I have to find a better way, but it takes a good second to fetch them all, so I prefer it hard-coded for now.
+# --- Build Apptainer ---
+OS_NAME=$(uname -s)
 
+if [ "$OS_NAME" == "Linux" ]; then
+    echo "🚀 Starting Apptainer build..."
 
-def main():
-    parser = argparse.ArgumentParser(description="Pixi extension to containerize a project with Apptainer")
-    parser.add_argument("-o", "--output", default="pixitainer.sif", help="Output image path (default: pixitainer.sif in current directory)")
-    parser.add_argument("-p", "--path", default=".", help="Working directory (source project)")
-    parser.add_argument("-s", "--seamless", action="store_true", help="Enable seamless execution")
-    parser.add_argument("-e", "--env", action="append", help="Specific environment(s) to install")
-    parser.add_argument("--base-image", default="ubuntu:24.04", help="Specify base image (default: ubuntu:24.04)")
-    parser.add_argument("--pixi-version", default="", help="Specify pixi version (default: latest)")
-    parser.add_argument("--keep-def", action="store_true", help="Export the .def file (do not delete temporary files)")
-    parser.add_argument("--verbose", action="store_true", help="Verbose mode (show full Apptainer build output)")
+    CMD=(apptainer build --force --fakeroot "$OUTPUT_ABS" "$TARGET_DEF")
 
-    args = parser.parse_args()
+    if [ "$VERBOSE" = true ]; then
+        "${CMD[@]}"
+    else
+        # Capture de sortie standard et erreur si non verbose
+        OUTPUT_LOG=$("${CMD[@]}" 2>&1) || {
+            EC=$?
+            echo "❌ Final build failed."
+            echo ""
+            echo "--- STDERR ---"
+            echo "$OUTPUT_LOG"
+            exit $EC
+        }
+    fi
 
-    # Resolve paths
-    wd = Path(args.path).resolve()
-    output_sif = Path(args.output).resolve()
+    echo "✅ Success! Image built at: $OUTPUT_ABS"
 
-    # Create the output directory if it doesn't exist
-    output_parent = output_sif.parent
-    output_parent.mkdir(parents=True, exist_ok=True)
+    # Cleanup
+    if [ "$KEEP_DEF" = true ]; then
+        echo "ℹ️  Definition file kept at: $TARGET_DEF"
+    else
+        if [ -d "$TMP_DIR" ]; then
+            rm -rf "$TMP_DIR"
+        fi
+    fi
 
-    # Place the temporary build folder in the OUTPUT directory
-    tmp_dir = output_parent / ".tmp_pixitainer"
+else
+    # Cas macOS / Windows
+    echo "✅ Definition file created at: $TARGET_DEF"
+    echo "⚠️  You are on $OS_NAME. Apptainer builds require Linux."
+    echo "ℹ️  To build the image, copy this folder to a Linux machine and run:"
+    echo "   apptainer build $(basename "$OUTPUT_ABS") $(basename "$TARGET_DEF")"
 
-    # Check for project files
-    pixi_toml = wd / "pixi.toml"
-    pixi_lock = wd / "pixi.lock"
-
-    if not pixi_toml.exists():
-        print(f"Error: pixi.toml not found in {wd}")
-        sys.exit(1)
-
-    print(f"📦 Containerizing project from: {wd}")
-    print(f"📂 Output target: {output_sif}")
-
-    # Prepare .def file
-    tmp_dir.mkdir(exist_ok=True)
-    target_path = tmp_dir / "pixitainer.def"
-
-    # Prepare %files section
-    files_section = f'    "{pixi_toml.as_posix()}" /opt/conf/pixi.toml\n'
-    files_section += f'    "{pixi_lock.as_posix()}" /opt/conf/pixi.lock'
-
-    if args.env:
-        env_flags = " ".join([f"-e {e}" for e in args.env])
-        install_cmd = f"pixi install {env_flags} --frozen"
-    else:
-        install_cmd = "pixi install -a --frozen"
-
-    # Seamless logic
-    runscript_content = 'pixi run --as-is -m /opt/conf/pixi.toml "$@"' if args.seamless else 'exec "$@"'
-
-    # Handle Pixi Version
-    pixi_version = ""
-    if args.pixi_version:
-        if args.pixi_version not in PIXI_VERSIONS:
-            print(f"Error: Specified Pixi version '{args.pixi_version}' is not recognized.")
-            print("Available versions are:")
-            print(", ".join(PIXI_VERSIONS))
-            sys.exit(1)
-        pixi_version = f"pixi self-update --version {args.pixi_version}"
-
-    # Write the template
-    content = TEMPLATE_CONTENT
-    content = content.replace("{{ FILES_SECTION }}", files_section)
-    content = content.replace("{{ RUNSCRIPT_CONTENT }}", runscript_content)
-    content = content.replace("{{ INSTALL_COMMAND }}", install_cmd)
-    content = content.replace("{{ BASE_IMAGE }}", args.base_image)
-    content = content.replace("{{ PIXI_VERSION_ENV }}", pixi_version)
-
-    target_path.write_text(content, encoding="utf-8")
-
-    # Platform specific logic
-    if sys.platform == "linux":
-        print("🚀 Starting Apptainer build...")
-        cmd = ["apptainer", "build", "--force", "--fakeroot", str(output_sif), str(target_path)]
-
-        capture = not args.verbose
-
-        try:
-            subprocess.run(
-                cmd,
-                check=True,
-                stdout=subprocess.PIPE if capture else None,
-                stderr=subprocess.PIPE if capture else None
-            )
-            success = True
-            print(f"✅ Success! Image built at: {output_sif}")
-        except subprocess.CalledProcessError as e:
-            # On the last attempt, strictly fail
-            print(f"❌ Final build failed.")
-            if not args.verbose:
-                print("\n--- STDERR ---")
-                print(e.stderr.decode('utf-8', errors='replace'))
-            sys.exit(e.returncode)
-
-        # Cleanup only if success (or if we want cleanup on fail, move this out)
-        if args.keep_def:
-            print(f"ℹ️  Definition file kept at: {target_path}")
-        elif tmp_dir.exists():
-            shutil.rmtree(tmp_dir)
-
-    else:
-        # On Windows/MacOS
-        print(f"✅ Definition file created at: {target_path}")
-        print("⚠️  You are on " + sys.platform + ". Apptainer builds require Linux.")
-        print("ℹ️ To build the image, copy this folder to a Linux machine (or WSL) and run:")
-        print(f"   apptainer build {output_sif.name} {target_path.name}")
-
-        if not args.keep_def:
-            print("ℹ️  Note: Use --keep-def on Linux to preserve this file automatically.")
-
-if __name__ == "__main__":
-    main()
+    if [ "$KEEP_DEF" != true ]; then
+        echo "ℹ️  Note: Use --keep-def on Linux to preserve this file automatically."
+    fi
+fi
