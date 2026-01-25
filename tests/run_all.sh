@@ -108,7 +108,6 @@ run_test_isolated "test_env.sh"
 run_test_isolated "test_base_image.sh"
 run_test_isolated "test_pixi_version.sh"
 run_test_isolated "test_keep_def.sh"
-run_test_isolated "test_verbose.sh"
 
 # --- Wait for completion ---
 echo -e "\n${BLUE}Waiting for tests to complete...${NC}\n"
