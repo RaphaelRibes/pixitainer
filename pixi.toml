@@ -23,4 +23,4 @@ cmd = "pixi upload prefix --channel raphaelribes output/linux-64/*.conda output/
 
 
 [dependencies]
-apptainer = ">=1.4.5,<2"
+rattler-build = "*"
