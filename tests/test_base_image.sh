@@ -18,3 +18,11 @@ fi
 # Verification
 echo "Verifying base image build..."
 pixi run -m ../../../pixi.toml apptainer run "$IMAGE_NAME" pixi run --as-is -m /opt/conf/pixi.toml "echo \$(pixi -V)"
+
+echo "Testing invalid base-image option (should fail)..."
+if $PIXI_CMD -o "should_fail.sif" --base-image "this_image_does_not_exist:really" 2>/dev/null; then
+    echo "Error: Command succeeded but should have failed with invalid base image."
+    exit 1
+else
+    echo "Success: Command failed as expected for invalid base image."
+fi

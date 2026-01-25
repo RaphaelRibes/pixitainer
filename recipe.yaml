@@ -1,6 +1,6 @@
 context:
   name: pixitainer
-  version: 0.2.2
+  version: 0.3.0
 
 package:
   name: ${{ name }}
@@ -17,13 +17,11 @@ build:
     - chmod +x $PREFIX/bin/pixi-containerize
 
 requirements:
-  host:
-    - python >=3.11
   run:
-    - python >=3.11
     - apptainer >=1.4.5
+    - bash
 
 about:
-  summary: A Pixi extension to containerize projects
+  summary: Pixi is cool, apptainer is cool, let's make them both work together !
   license: BSD-3-Clause
   homepage: https://github.com/raphaelribes/pixitainer
