@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+PIXITAINER_VERSION="0.3.0"
 
 # --- Valeurs par défaut ---
 OUTPUT="pixitainer.sif"
@@ -15,7 +16,8 @@ declare -a ENVS
 usage() {
     echo "Usage: $0 [options]"
     echo ""
-    echo "Pixi extension to containerize a project with Apptainer"
+    echo "Pixi extension to containerize a project with Apptainer."
+    echo "Version: $PIXITAINER_VERSION"
     echo ""
     echo "Options:"
     echo "  -o, --output OUTPUT       Output image path (default: pixitainer.sif)"
@@ -77,18 +79,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Résolution des chemins ---
-# On utilise cd + pwd pour obtenir le chemin absolu compatible Linux/macOS
-WD=$(cd "$PROJECT_PATH" && pwd)
+WD=$(cd "$PROJECT_PATH" && pwd -P)
 # Pour l'output, on gère le cas où le fichier n'existe pas encore
 OUTPUT_DIR=$(dirname "$OUTPUT")
 # Si output est relatif, on le rend absolu par rapport au dossier courant
 if [[ "$OUTPUT_DIR" == "." ]]; then
-    OUTPUT_ABS="$(pwd)/$OUTPUT"
-    OUTPUT_PARENT="$(pwd)"
+    OUTPUT_ABS="$(pwd -P)/$OUTPUT"
+    OUTPUT_PARENT="$(pwd -P)"
 else
     mkdir -p "$OUTPUT_DIR"
-    OUTPUT_ABS="$(cd "$OUTPUT_DIR" && pwd)/$(basename "$OUTPUT")"
-    OUTPUT_PARENT="$(cd "$OUTPUT_DIR" && pwd)"
+    OUTPUT_ABS="$(cd "$OUTPUT_DIR" && pwd -P)/$(basename "$OUTPUT")"
+    OUTPUT_PARENT="$(cd "$OUTPUT_DIR" && pwd -P)"
 fi
 
 TMP_DIR="$OUTPUT_PARENT/.tmp_pixitainer"

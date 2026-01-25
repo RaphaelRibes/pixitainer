@@ -53,9 +53,9 @@ curl -fsSL https://pixi.sh/install.sh | sh
 ```
 ## User
 
-Simply install pixitainer globaly on pixi:
+Install pixitainer globaly on pixi:
 ```bash
-pixi global install pixitainer
+pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer
 ```
 
 ## Developer
