@@ -10,3 +10,6 @@ description = "Publish the built pixitainer package to the raphaelribes channel.
 [package.build.backend]
 name = "pixi-build-rattler-build"
 version = ">=0.3.7"
+
+[target.linux.dependencies]
+pixitainer.path = "."
