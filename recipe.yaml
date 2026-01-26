@@ -11,6 +11,7 @@ source:
 
 build:
   number: 0
+  noarch: generic
   script:
     - mkdir -p $PREFIX/bin
     - cp pixi-containerize $PREFIX/bin/pixi-containerize
@@ -18,6 +19,7 @@ build:
 
 requirements:
   run:
+    - __linux
     - apptainer >=1.4.5
     - bash
 
