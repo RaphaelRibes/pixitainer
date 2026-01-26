@@ -1,15 +1,12 @@
 [workspace]
 channels = ["conda-forge"]
-name = "pixitainer"
-platforms = ["linux-64", "linux-aarch64", "linux-ppc64le", "osx-arm64", "win-64"]
-
-[tasks.build]
-cmd = "rattler-build build --recipe recipe.yaml --output-dir output"
-description = "Build the pixitainer package using rattler-build."
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
+preview = ["pixi-build"]
 
 [tasks.publish]
 cmd = "pixi upload prefix --channel raphaelribes output/noarch/*.conda --force"
 description = "Publish the built pixitainer package to the raphaelribes channel."
 
-[dependencies]
-rattler-build = "*"
+[package.build.backend]
+name = "pixi-build-rattler-build"
+version = ">=0.3.7"
