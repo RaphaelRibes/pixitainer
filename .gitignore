@@ -4,3 +4,7 @@
 .idea/
 *.sif
 tests/RaMiLass/
+
+rattler-build-log.txt
+output/
+*.conda

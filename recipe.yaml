@@ -11,6 +11,7 @@ source:
 
 build:
   number: 0
+  noarch: generic
   script:
     - mkdir -p $PREFIX/bin
     - cp pixi-containerize $PREFIX/bin/pixi-containerize
@@ -18,10 +19,14 @@ build:
 
 requirements:
   run:
+    - __linux
     - apptainer >=1.4.5
     - bash
 
 about:
   summary: Pixi is cool, apptainer is cool, let's make them both work together !
   license: BSD-3-Clause
+  license_file: LICENSE
   homepage: https://github.com/raphaelribes/pixitainer
+  repository: https://github.com/raphaelribes/pixitainer
+  
