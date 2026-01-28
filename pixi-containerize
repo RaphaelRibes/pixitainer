@@ -236,8 +236,8 @@ else
     # Trap to restore cursor and clean log on exit
     trap 'tput cnorm 2>/dev/null || true; rm -f "$LOG_FILE" "$STEP_FILE"' EXIT
 
-    # Use pipefail to catch apptainer exit code through the pipe
     set -o pipefail
+    set +e
 
     # Run build, pipe output to loop
     "${CMD[@]}" 2>&1 | while IFS= read -r line; do
