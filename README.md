@@ -31,12 +31,16 @@ TODO:
 - [x] Pixi package that I can add as an extension.
 - [x] Adding options to the extension.
   - [x] Build options
-    - [x] Seamless mode (`-s`, `--seamless`)
+    - [x] Output image path (`-o`, `--output`)
+    - [x] Working directory (`-p`, `--path`)
+    - [x] Enable seamless execution (`-s`, `--seamless`)
     - [x] Specific environment selection (`-e`, `--env`)
+    - [x] Verbose mode (`-v`, `--verbose`)
+    - [x] Quiet mode (`-q`, `--quiet`)
     - [x] Specify base image (`--base-image`)
     - [x] Specify pixi version (`--pixi-version`)
     - [x] Export the `.def` file (`--keep-def`)
-    - [x] Verbose mode (`--verbose`)
+    - [ ] Add extra files/folders (`--add-file`)
 - [ ] Support of container solutions 
    - [x] Apptainer
    - [ ] Singularity
