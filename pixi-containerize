@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-PIXITAINER_VERSION="0.3.1"
+PIXITAINER_VERSION="0.3.2"
 
 # --- Valeurs par défaut ---
 OUTPUT="pixitainer.sif"
@@ -12,6 +12,7 @@ KEEP_DEF=false
 VERBOSE=false
 QUIET=false
 declare -a ENVS
+declare -a EXTRA_FILES
 
 # --- Fonction d'aide ---
 usage() {
@@ -29,6 +30,7 @@ usage() {
     echo "  -v, --verbose             Verbose mode (show full Apptainer build output)"
     echo "  --base-image IMAGE        Specify base image (default: ubuntu:24.04)"
     echo "  --pixi-version VERSION    Specify pixi version (default: latest)"
+    echo "  --add-file SRC:DEST       Add a file to the container (format: source:destination)"
     echo "  --keep-def                Export the .def file (do not delete temporary files)"
     echo "  -h, --help                Show this help message"
 }
@@ -73,6 +75,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --pixi-version)
             TARGET_PIXI_VERSION="$2"
+            shift 2
+            ;;
+        --add-file)
+            EXTRA_FILES+=("$2")
             shift 2
             ;;
         --keep-def)
@@ -129,6 +135,19 @@ FILES_SECTION="    \"$PIXI_TOML\" /opt/conf/pixi.toml"
 if [ -f "$PIXI_LOCK" ]; then
     FILES_SECTION="$FILES_SECTION"$'\n'"    \"$PIXI_LOCK\" /opt/conf/pixi.lock"
 fi
+
+# Rajoute des fichiers supplémentaires
+for file_spec in "${EXTRA_FILES[@]}"; do
+    # Split "source:destination"
+    if [[ "$file_spec" == *":"* ]]; then
+        src="${file_spec%%:*}"
+        dest="${file_spec#*:}"
+        FILES_SECTION="$FILES_SECTION"$'\n'"    \"$src\" \"$dest\""
+    else
+        # If no destination is provided, Apptainer copies it to the root or preserves name
+        FILES_SECTION="$FILES_SECTION"$'\n'"    \"$file_spec\""
+    fi
+done
 
 # Construction de la commande d'installation
 if [ ${#ENVS[@]} -gt 0 ]; then
