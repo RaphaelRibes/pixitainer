@@ -2,7 +2,7 @@
 channels = ["conda-forge"]
 name = "pixitainer"
 platforms = ["linux-64", "linux-aarch64", "linux-ppc64le"]
-version = "0.3.2"
+version = "0.3.3"
 
 [tasks]
 hello = "echo 'Hello, Pixitainer!'"
