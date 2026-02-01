@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-PIXITAINER_VERSION="0.3.2"
+PIXITAINER_VERSION="0.3.3"
 
 # --- Valeurs par défaut ---
 OUTPUT="pixitainer.sif"
@@ -11,6 +11,7 @@ TARGET_PIXI_VERSION=""
 KEEP_DEF=false
 VERBOSE=false
 QUIET=false
+NO_INSTALL=false
 declare -a ENVS
 declare -a EXTRA_FILES
 
@@ -32,6 +33,7 @@ usage() {
     echo "  --pixi-version VERSION    Specify pixi version (default: latest)"
     echo "  --add-file SRC:DEST       Add a file to the container (format: source:destination)"
     echo "  --keep-def                Export the .def file (do not delete temporary files)"
+    echo "  --no-install              Do not install any environments"
     echo "  -h, --help                Show this help message"
 }
 
@@ -83,6 +85,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --keep-def)
             KEEP_DEF=true
+            shift
+            ;;
+        --no-install)
+            NO_INSTALL=true
             shift
             ;;
         -h|--help)
@@ -150,7 +156,9 @@ for file_spec in "${EXTRA_FILES[@]}"; do
 done
 
 # Construction de la commande d'installation
-if [ ${#ENVS[@]} -gt 0 ]; then
+if [ "$NO_INSTALL" = true ]; then
+    INSTALL_CMD="echo 'Skipping environment installation'"
+elif [ ${#ENVS[@]} -gt 0 ]; then
     ENV_FLAGS=""
     for env in "${ENVS[@]}"; do
         ENV_FLAGS="$ENV_FLAGS -e $env"

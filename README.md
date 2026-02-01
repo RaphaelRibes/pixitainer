@@ -1,5 +1,5 @@
 # Pixitainer
-![Version](https://img.shields.io/badge/Version-0.3.0-blue)
+![Version](https://img.shields.io/badge/Version-0.3.3-blue)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![License](https://img.shields.io/badge/Licence-BSD--3--Clause-green)](LICENSE)
 [![Forge](https://img.shields.io/badge/Forge-Prefix.dev--Forge-yellow)](https://prefix.dev/channels/raphaelribes/packages/pixitainer)
@@ -41,6 +41,7 @@ TODO:
     - [x] Specify pixi version (`--pixi-version`)
     - [x] Add extra files/folders (`--add-file`)
     - [x] Export the `.def` file (`--keep-def`)
+    - [x] No installation of environment in the container (`--no-install`)
 - [ ] Support of container solutions 
    - [x] Apptainer
    - [ ] Singularity
