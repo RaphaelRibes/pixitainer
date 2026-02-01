@@ -39,8 +39,8 @@ TODO:
     - [x] Quiet mode (`-q`, `--quiet`)
     - [x] Specify base image (`--base-image`)
     - [x] Specify pixi version (`--pixi-version`)
+    - [x] Add extra files/folders (`--add-file`)
     - [x] Export the `.def` file (`--keep-def`)
-    - [ ] Add extra files/folders (`--add-file`)
 - [ ] Support of container solutions 
    - [x] Apptainer
    - [ ] Singularity
