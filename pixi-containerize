@@ -15,7 +15,7 @@ declare -a ENVS
 
 # --- Fonction d'aide ---
 usage() {
-    echo "Usage: $0 [options]"
+    echo "Usage: pixi containerize [options]"
     echo ""
     echo "Pixi extension to containerize a project with Apptainer."
     echo "Version: $PIXITAINER_VERSION"
