@@ -1,5 +1,6 @@
 # Pixitainer
-![Version](https://img.shields.io/badge/Version-0.3.0-blue)
+
+![Version](https://img.shields.io/badge/Version-0.3.4-blue)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![License](https://img.shields.io/badge/Licence-BSD--3--Clause-green)](LICENSE)
 [![Forge](https://img.shields.io/badge/Forge-Prefix.dev--Forge-yellow)](https://prefix.dev/channels/raphaelribes/packages/pixitainer)
@@ -24,42 +25,56 @@ Apptainer is more the "public library" version of the software, while Singularit
 Because Apptainer is hosted by the Linux Foundation, it is designed specifically for the scientific community to ensure that your research code remains free, accessible and without being tied to a private company’s profit goals.
 
 ## How ?
+
 The best thing to do will be to add this way as a [pixi extension](https://pixi.sh/latest/integration/extensions/introduction/), so we just have to type `pixi containerize`, some option and tada !
 
 TODO:
+
 - [x] Receipe that works.
 - [x] Pixi package that I can add as an extension.
 - [x] Adding options to the extension.
   - [x] Build options
-    - [x] Seamless mode (`-s`, `--seamless`)
+    - [x] Output image path (`-o`, `--output`)
+    - [x] Working directory (`-p`, `--path`)
+    - [x] Enable seamless execution (`-s`, `--seamless`)
     - [x] Specific environment selection (`-e`, `--env`)
+    - [x] Verbose mode (`-v`, `--verbose`)
+    - [x] Quiet mode (`-q`, `--quiet`)
     - [x] Specify base image (`--base-image`)
     - [x] Specify pixi version (`--pixi-version`)
+    - [x] Add extra files/folders (`--add-file`)
     - [x] Export the `.def` file (`--keep-def`)
-    - [x] Verbose mode (`--verbose`)
-- [ ] Support of container solutions 
-   - [x] Apptainer
-   - [ ] Singularity
-   - [ ] Docker
+    - [x] No installation of environment in the container (`--no-install`)
+    - [x] Run extra post commands (`--post-command`)
+- [ ] Support of container solutions
+  - [x] Apptainer
+  - [ ] Singularity
+  - [ ] Docker
     > Note that by default pixitainer is made with Apptainer in mind so it will be an option to install other container solutions.
 - [x] Testings.
 - [x] Publish
 - [ ] Go back to step 3 until WW3, messiah or death of the internet
 
 # How to install
+
 0. Install pixi
+
 ```bash
 curl -fsSL https://pixi.sh/install.sh | sh
 ```
+
 ## User
 
 Install pixitainer globaly on pixi:
+
 ```bash
 pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer
 ```
 
 ## Developer
+
 1. Clone this repo
+
 ```bash
 git clone https://github.com/RaphaelRibes/pixitainer.git
 cd pixitainer
@@ -67,7 +82,7 @@ cd pixitainer
 
 2. Build the pixitainer extension
 ```bash
-pixi run build_all
+pixi run build
 ```
 
 3. Install the pixitainer extension
@@ -78,22 +93,27 @@ pixi global install pixitainer --channel $(pwd -P)/output --channel conda-forge
 # How to use
 
 You actually have two ways of using pixitainer:
+
 1. Manually
 2. Seamlessly
 
 We put ourselves in an environment with one task defined like
+
 ```yaml
 [tasks]
 make_dir = 'mkdir testdir'
 ```
 
 ## Manually
+
 You can also build the container manually with apptainer
+
 ```bash
 pixi containerize
 ```
 
 Then you can use pixi in your image
+
 ```bash
 apptainer run -f pixitainer.sif pixi run --as-is -m /opt/conf/pixi.toml make_dir
 ```
@@ -103,22 +123,26 @@ We add `--as-is` to make sure it sticks to the `pixi.lock` file and it only uses
 > **WARNING**: `-m /opt/conf/pixi.toml` is mandatory or pixi will use the default one in your current working directory.
 
 ## Seamlessly
+
 Just use the pixitainer extension command after installing it with the seamless option (`-s`, `--seamless`).
+
 ```bash
 pixi containerize -s
 ```
 
 You can then turn your task like pixi is not even here
+
 ```bash
 apptainer run -f pixitainer.sif make_dir
 ```
 
 > **WARNING**: the seamless mode makes that every commands run through the image are ran like so
+>
 > ```bash
 > pixi run --as-is -m /opt/conf/pixi.toml "$@"
 > ```
+>
 > Meaning that you only have access to `pixi run` and nothing else.
-
 
 # Known problems
 
@@ -127,16 +151,24 @@ apptainer run -f pixitainer.sif make_dir
 When launching a command in the pixi shell, the `cwd` of tasks will be changed into the one of the pixi workplace (`PIXI_PROJECT_ROOT`).
 
 Let's create a task
+
 ```yaml
 [tasks]
 make_dir = 'mkdir testdir'
 ```
+
 If you run this task, it's going to create `$PIXI_PROJECT_ROOT/testdir` (`/opt/conf/testdir`) and not `$INIT_CWD/testdir` (`$(pwd)/testdir`).
 What you want is to run pixi in the `INIT_CWD` so take the time to change your `./something` to `$INIT_CWD/something`.
 
+> **Note**: The container now defaults to `/opt/conf` as the working directory (`pwd -P` returns `/opt/conf`). 
+> This ensures compatibility with internal path resolutions, but you should rely on `$INIT_CWD` for input/output relative to where you run the container.
+> If you have files to import in the container (ex: your build) you can put it in `/opt/conf` and it will allow normal execution.
+> However, be conscious that your outputs will also be in `/opt/conf` and not in your current working directory.
+> Since you cannot write in a container, you will have to specify the outputs with `$INIT_CWD` and bind the folder where you want your outputs to be.
+> 
 ## Read-only file system (os error 30)
 
-This is related to the previous problem: pixi is using `PIXI_PROJECT_ROOT` as the `cwd`. 
+This is related to the previous problem: pixi is using `PIXI_PROJECT_ROOT` as the `cwd`.
 It's going to try to write in `/opt/conf` wich is not allowed because the sif image is in read only.
 To fix it, replace your `mkdir test` byt `mkdir $INIT_CWD/test`.
 

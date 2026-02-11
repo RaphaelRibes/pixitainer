@@ -1,6 +1,6 @@
 context:
   name: pixitainer
-  version: 0.3.0
+  version: 0.3.4
 
 package:
   name: ${{ name }}
@@ -29,4 +29,4 @@ about:
   license_file: LICENSE
   homepage: https://github.com/raphaelribes/pixitainer
   repository: https://github.com/raphaelribes/pixitainer
-  
+  description: It takes too much time to build and rebuild your Apptainer/Singularity containers but pixi is hard to integrate in your pipelines ? Pixitainer is here to help you containerize your pixi pipelines into Apptainer/Singularity containers easily.

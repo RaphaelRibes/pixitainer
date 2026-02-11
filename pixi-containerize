@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-PIXITAINER_VERSION="0.3.0"
+PIXITAINER_VERSION="0.3.4"
 
 # --- Valeurs par défaut ---
 OUTPUT="pixitainer.sif"
@@ -10,11 +10,15 @@ BASE_IMAGE="ubuntu:24.04"
 TARGET_PIXI_VERSION=""
 KEEP_DEF=false
 VERBOSE=false
+QUIET=false
+NO_INSTALL=false
 declare -a ENVS
+declare -a EXTRA_FILES
+declare -a POST_COMMANDS
 
 # --- Fonction d'aide ---
 usage() {
-    echo "Usage: $0 [options]"
+    echo "Usage: pixi containerize [options]"
     echo ""
     echo "Pixi extension to containerize a project with Apptainer."
     echo "Version: $PIXITAINER_VERSION"
@@ -24,11 +28,22 @@ usage() {
     echo "  -p, --path PATH           Working directory (source project)"
     echo "  -s, --seamless            Enable seamless execution"
     echo "  -e, --env ENV             Specific environment(s) to install (can be used multiple times)"
+    echo "  -q, --quiet               Quiet mode (suppress all output, return 0 on success, 1 on error)"
+    echo "  -v, --verbose             Verbose mode (show full Apptainer build output)"
     echo "  --base-image IMAGE        Specify base image (default: ubuntu:24.04)"
     echo "  --pixi-version VERSION    Specify pixi version (default: latest)"
+    echo "  --add-file SRC:DEST       Add a file to the container (format: source:destination)"
+    echo "  --post-command CMD        Add a command to run in %post section (can be used multiple times)"
     echo "  --keep-def                Export the .def file (do not delete temporary files)"
-    echo "  --verbose                 Verbose mode (show full Apptainer build output)"
+    echo "  --no-install              Do not install any environments"
     echo "  -h, --help                Show this help message"
+}
+
+# Wrapper to echo only if not quiet
+log() {
+    if [ "$QUIET" = false ]; then
+        echo "$@"
+    fi
 }
 
 # --- Parsing des arguments ---
@@ -50,6 +65,14 @@ while [[ $# -gt 0 ]]; do
             ENVS+=("$2")
             shift 2
             ;;
+        -q|--quiet)
+            QUIET=true
+            shift
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
         --base-image)
             BASE_IMAGE="$2"
             shift 2
@@ -58,12 +81,21 @@ while [[ $# -gt 0 ]]; do
             TARGET_PIXI_VERSION="$2"
             shift 2
             ;;
+        --add-file)
+
+            EXTRA_FILES+=("$2")
+            shift 2
+            ;;
+        --post-command)
+            POST_COMMANDS+=("$2")
+            shift 2
+            ;;
         --keep-def)
             KEEP_DEF=true
             shift
             ;;
-        --verbose)
-            VERBOSE=true
+        --no-install)
+            NO_INSTALL=true
             shift
             ;;
         -h|--help)
@@ -98,12 +130,14 @@ PIXI_LOCK="$WD/pixi.lock"
 
 # --- Vérifications ---
 if [ ! -f "$PIXI_TOML" ]; then
-    echo "Error: pixi.toml not found in $WD"
+    if [ "$QUIET" = false ]; then
+        echo "Error: pixi.toml not found in $WD"
+    fi
     exit 1
 fi
 
-echo "📦 Containerizing project from: $WD"
-echo "📂 Output target: $OUTPUT_ABS"
+log "📦 Containerizing project from: $WD"
+log "📂 Output target: $OUTPUT_ABS"
 
 # --- Préparation du .def ---
 mkdir -p "$TMP_DIR"
@@ -115,8 +149,23 @@ if [ -f "$PIXI_LOCK" ]; then
     FILES_SECTION="$FILES_SECTION"$'\n'"    \"$PIXI_LOCK\" /opt/conf/pixi.lock"
 fi
 
+# Rajoute des fichiers supplémentaires
+for file_spec in "${EXTRA_FILES[@]}"; do
+    # Split "source:destination"
+    if [[ "$file_spec" == *":"* ]]; then
+        src="${file_spec%%:*}"
+        dest="${file_spec#*:}"
+        FILES_SECTION="$FILES_SECTION"$'\n'"    \"$src\" \"$dest\""
+    else
+        # If no destination is provided, Apptainer copies it to the root or preserves name
+        FILES_SECTION="$FILES_SECTION"$'\n'"    \"$file_spec\""
+    fi
+done
+
 # Construction de la commande d'installation
-if [ ${#ENVS[@]} -gt 0 ]; then
+if [ "$NO_INSTALL" = true ]; then
+    INSTALL_CMD="echo 'Skipping environment installation'"
+elif [ ${#ENVS[@]} -gt 0 ]; then
     ENV_FLAGS=""
     for env in "${ENVS[@]}"; do
         ENV_FLAGS="$ENV_FLAGS -e $env"
@@ -140,6 +189,7 @@ if [ -n "$TARGET_PIXI_VERSION" ]; then
 fi
 
 # Écriture du fichier de définition (Here-Doc)
+# Note: We inject "STEP:" echoes to track progress in non-verbose mode
 cat <<EOF > "$TARGET_DEF"
 Bootstrap: docker
 From: $BASE_IMAGE
@@ -156,10 +206,12 @@ $FILES_SECTION
     export DEBIAN_FRONTEND=noninteractive
 
     # 1. Install system dependencies
+    echo "STEP: Updating the image"
     apt-get update && apt-get install -y curl
 
     # 2. Install Pixi globally to /opt/pixi
     export PIXI_HOME=/opt/pixi
+    echo "STEP: Downloading Pixi"
     curl -fsSL https://pixi.sh/install.sh | bash
     export PATH="/opt/pixi/bin:\$PATH"
 
@@ -169,61 +221,112 @@ $FILES_SECTION
     mkdir -p /opt/conf
     cd /opt/conf
 
-    echo "Installing project environment..."
+    echo "STEP: Installing the environment"
     pixi config set --local run-post-link-scripts insecure
     $INSTALL_CMD
 
+    # 3.5 Run extra post commands
+    echo "STEP: Running extra post commands"
+    $(printf '%s\n' "${POST_COMMANDS[@]}")
+
     # 4. Cleanup
+    echo "STEP: Cleaning"
     apt-get remove -y curl
     apt-get autoremove -y
     apt-get clean
     rm -rf /var/lib/apt/lists/*
 
 %runscript
+    cd /opt/conf
     $RUNSCRIPT_CONTENT
 EOF
 
 # --- Build Apptainer ---
-OS_NAME=$(uname -s)
+log "🚀 Starting Apptainer build..."
 
-if [ "$OS_NAME" == "Linux" ]; then
-    echo "🚀 Starting Apptainer build..."
+CMD=(apptainer build --force --fakeroot "$OUTPUT_ABS" "$TARGET_DEF")
 
-    CMD=(apptainer build --force --fakeroot "$OUTPUT_ABS" "$TARGET_DEF")
-
-    if [ "$VERBOSE" = true ]; then
-        "${CMD[@]}"
-    else
-        # Capture de sortie standard et erreur si non verbose
-        OUTPUT_LOG=$("${CMD[@]}" 2>&1) || {
-            EC=$?
-            echo "❌ Final build failed."
-            echo ""
-            echo "--- STDERR ---"
-            echo "$OUTPUT_LOG"
-            exit $EC
-        }
+if [ "$QUIET" = true ]; then
+    # Quiet Mode: Run completely silently.
+    if ! "${CMD[@]}" > /dev/null 2>&1; then
+        exit 1
     fi
-
-    echo "✅ Success! Image built at: $OUTPUT_ABS"
-
-    # Cleanup
-    if [ "$KEEP_DEF" = true ]; then
-        echo "ℹ️  Definition file kept at: $TARGET_DEF"
-    else
-        if [ -d "$TMP_DIR" ]; then
-            rm -rf "$TMP_DIR"
-        fi
-    fi
-
+elif [ "$VERBOSE" = true ]; then
+    # Verbose Mode: Run directly
+    "${CMD[@]}"
 else
-    # Cas macOS / Windows
-    echo "✅ Definition file created at: $TARGET_DEF"
-    echo "⚠️  You are on $OS_NAME. Apptainer builds require Linux."
-    echo "ℹ️  To build the image, copy this folder to a Linux machine and run:"
-    echo "   apptainer build $(basename "$OUTPUT_ABS") $(basename "$TARGET_DEF")"
+    # Normal Mode: Spinner UI
 
-    if [ "$KEEP_DEF" != true ]; then
-        echo "ℹ️  Note: Use --keep-def on Linux to preserve this file automatically."
+    # Temp files
+    LOG_FILE="$(mktemp)"
+    STEP_FILE="$(mktemp)" # To track current step across subshells
+
+    # Init step
+    CURRENT_STEP="Presetup (downloading image, importing files)"
+    echo "$CURRENT_STEP" > "$STEP_FILE"
+
+    # Spinner chars
+    SPIN='-\|/'
+    i=0
+
+    # Hide Cursor
+    tput civis 2>/dev/null || true
+
+    # Trap to restore cursor and clean log on exit
+    trap 'tput cnorm 2>/dev/null || true; rm -f "$LOG_FILE" "$STEP_FILE"' EXIT
+
+    set -o pipefail
+    set +e
+
+    # Run build, pipe output to loop
+    "${CMD[@]}" 2>&1 | while IFS= read -r line; do
+        # Save output to log file
+        echo "$line" >> "$LOG_FILE"
+
+        # Check for our injected STEP markers
+        if [[ "$line" == "STEP: "* ]]; then
+            # Mark previous step as done (overwrite spinner line with checkmark)
+            printf "\r [✅] %s\033[K\n" "$CURRENT_STEP"
+
+            # Update to new step
+            CURRENT_STEP="${line#STEP: }"
+            echo "$CURRENT_STEP" > "$STEP_FILE"
+
+            # Reset spinner
+            i=0
+        fi
+
+        # Update Spinner for CURRENT step
+        printf "\r [${SPIN:i++%4:1}] %s\033[K" "$CURRENT_STEP"
+    done
+
+    EC=$?
+
+    # Retrieve the very last step state from the temp file
+    LAST_STEP=$(cat "$STEP_FILE")
+
+    if [ $EC -eq 0 ]; then
+        # Mark the final step as done
+        printf "\r [✅] %s\033[K\n" "$LAST_STEP"
+    else
+        # Mark the final step as failed
+        printf "\r [❌] %s\033[K\n" "$LAST_STEP"
+        echo ""
+        echo "❌ Final build failed."
+        echo ""
+        echo "--- LOGS ---"
+        cat "$LOG_FILE"
+        exit $EC
+    fi
+fi
+
+log "✅ Success! Image built at: $OUTPUT_ABS"
+
+# Cleanup
+if [ "$KEEP_DEF" = true ]; then
+    log "ℹ️  Definition file kept at: $TARGET_DEF"
+else
+    if [ -d "$TMP_DIR" ]; then
+        rm -rf "$TMP_DIR"
     fi
 fi
