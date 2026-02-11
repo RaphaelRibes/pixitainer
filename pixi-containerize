@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-PIXITAINER_VERSION="0.3.3"
+PIXITAINER_VERSION="0.3.4"
 
 # --- Valeurs par défaut ---
 OUTPUT="pixitainer.sif"
@@ -14,6 +14,7 @@ QUIET=false
 NO_INSTALL=false
 declare -a ENVS
 declare -a EXTRA_FILES
+declare -a POST_COMMANDS
 
 # --- Fonction d'aide ---
 usage() {
@@ -32,6 +33,7 @@ usage() {
     echo "  --base-image IMAGE        Specify base image (default: ubuntu:24.04)"
     echo "  --pixi-version VERSION    Specify pixi version (default: latest)"
     echo "  --add-file SRC:DEST       Add a file to the container (format: source:destination)"
+    echo "  --post-command CMD        Add a command to run in %post section (can be used multiple times)"
     echo "  --keep-def                Export the .def file (do not delete temporary files)"
     echo "  --no-install              Do not install any environments"
     echo "  -h, --help                Show this help message"
@@ -80,7 +82,12 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --add-file)
+
             EXTRA_FILES+=("$2")
+            shift 2
+            ;;
+        --post-command)
+            POST_COMMANDS+=("$2")
             shift 2
             ;;
         --keep-def)
@@ -218,6 +225,10 @@ $FILES_SECTION
     pixi config set --local run-post-link-scripts insecure
     $INSTALL_CMD
 
+    # 3.5 Run extra post commands
+    echo "STEP: Running extra post commands"
+    $(printf '%s\n' "${POST_COMMANDS[@]}")
+
     # 4. Cleanup
     echo "STEP: Cleaning"
     apt-get remove -y curl
@@ -226,6 +237,7 @@ $FILES_SECTION
     rm -rf /var/lib/apt/lists/*
 
 %runscript
+    cd /opt/conf
     $RUNSCRIPT_CONTENT
 EOF
 
