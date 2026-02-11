@@ -6,3 +6,4 @@
 tests/RaMiLass/
 rattler-build-log.txt
 output/
+*.conda
