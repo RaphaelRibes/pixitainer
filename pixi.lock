@@ -41,6 +41,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-ppc64le/openssl-3.6.0-hb9a03e6_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-ppc64le/patchelf-0.17.2-hea85c5d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-ppc64le/rattler-build-0.54.0-hd5b43e5_0.conda
+      osx-arm64:
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/rattler-build-0.55.1-h6fdd925_0.conda
 packages:
 - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
   sha256: fe51de6107f9edc7aa4f786a70f4a883943bc9d39b3bb7307c04c41410990726
@@ -349,3 +351,14 @@ packages:
   license_family: BSD
   size: 21573481
   timestamp: 1765220808135
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/rattler-build-0.55.1-h6fdd925_0.conda
+  sha256: 7d31a25e45823fc4fda6281b019c7875d2626ea8b1522cd58c56c6035b92e5c5
+  md5: 6b38c4d55fbdf0f06d3c08674d2a9379
+  depends:
+  - __osx >=11.0
+  constrains:
+  - __osx >=11.0
+  license: BSD-3-Clause
+  license_family: BSD
+  size: 15105783
+  timestamp: 1767788828061

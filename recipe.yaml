@@ -26,6 +26,7 @@ requirements:
 about:
   summary: Pixi is cool, apptainer is cool, let's make them both work together !
   license: BSD-3-Clause
+  license_file: LICENSE
   homepage: https://github.com/raphaelribes/pixitainer
+  repository: https://github.com/raphaelribes/pixitainer
   description: It takes too much time to build and rebuild your Apptainer/Singularity containers but pixi is hard to integrate in your pipelines ? Pixitainer is here to help you containerize your pixi pipelines into Apptainer/Singularity containers easily.
-  repository: https://github.com/RaphaelRibes/pixitainer.git
