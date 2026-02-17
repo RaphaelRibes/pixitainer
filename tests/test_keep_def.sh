@@ -3,7 +3,7 @@ set -e
 
 cd "$REPO_DIR"
 IMAGE_NAME="keep_def_test.sif"
-DEF_FILE=".tmp_pixitainer/pixitainer.def"
+DEF_FILE="keep_def_test.def"
 
 # Cleanup potential leftovers
 rm -rf .tmp_pixitainer
