@@ -82,12 +82,12 @@ cd pixitainer
 
 2. Build the pixitainer extension
 ```bash
-pixi run build
+pixi build
 ```
 
 3. Install the pixitainer extension
 ```bash
-pixi global install pixitainer --channel $(pwd -P)/output --channel conda-forge
+pixi global install pixitainer --path *.conda --channel conda-forge
 ```
 
 # How to use
