@@ -7,7 +7,14 @@ IMAGE_NAME="seamless_test.sif"
 rm -f "$IMAGE_NAME"
 
 echo "Testing --seamless option..."
-$PIXI_CMD -o "$IMAGE_NAME" --seamless
+OUTPUT_LOG="seamless_log.txt"
+$PIXI_CMD -o "$IMAGE_NAME" --seamless > "$OUTPUT_LOG" 2>&1
+
+if ! grep -q "Seamless mode enabled" "$OUTPUT_LOG"; then
+    echo "Error: 'Seamless mode enabled' not found in output."
+    cat "$OUTPUT_LOG"
+    exit 1
+fi
 
 if [ ! -f "$IMAGE_NAME" ]; then
     echo "Error: $IMAGE_NAME not found."

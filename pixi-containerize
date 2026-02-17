@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-PIXITAINER_VERSION="0.3.4"
+PIXITAINER_VERSION="0.3.5"
 
 # --- Valeurs par défaut ---
 OUTPUT="pixitainer.sif"
@@ -141,7 +141,9 @@ log "📂 Output target: $OUTPUT_ABS"
 
 # --- Préparation du .def ---
 mkdir -p "$TMP_DIR"
-TARGET_DEF="$TMP_DIR/pixitainer.def"
+# Derive .def name from output name (e.g. myimage.sif -> myimage.def)
+DEF_NAME="$(basename "${OUTPUT%.*}").def"
+TARGET_DEF="$TMP_DIR/$DEF_NAME"
 
 # Construction de la section %files
 FILES_SECTION="    \"$PIXI_TOML\" /opt/conf/pixi.toml"
@@ -155,9 +157,11 @@ for file_spec in "${EXTRA_FILES[@]}"; do
     if [[ "$file_spec" == *":"* ]]; then
         src="${file_spec%%:*}"
         dest="${file_spec#*:}"
+        log "ℹ️  Adding file: $src -> $dest"
         FILES_SECTION="$FILES_SECTION"$'\n'"    \"$src\" \"$dest\""
     else
         # If no destination is provided, Apptainer copies it to the root or preserves name
+        log "ℹ️  Adding file: $file_spec"
         FILES_SECTION="$FILES_SECTION"$'\n'"    \"$file_spec\""
     fi
 done
@@ -177,6 +181,7 @@ fi
 
 # Logique Seamless
 if [ "$SEAMLESS" = true ]; then
+    log "ℹ️  Seamless mode enabled"
     RUNSCRIPT_CONTENT='pixi run --as-is -m /opt/conf/pixi.toml "$@"'
 else
     RUNSCRIPT_CONTENT='exec "$@"'
@@ -226,8 +231,10 @@ $FILES_SECTION
     $INSTALL_CMD
 
     # 3.5 Run extra post commands
-    echo "STEP: Running extra post commands"
-    $(printf '%s\n' "${POST_COMMANDS[@]}")
+    $(if [ ${#POST_COMMANDS[@]} -gt 0 ]; then
+        echo "echo \"STEP: Running extra post commands\""
+        printf '%s\n' "${POST_COMMANDS[@]}"
+    fi)
 
     # 4. Cleanup
     echo "STEP: Cleaning"
@@ -324,9 +331,11 @@ log "✅ Success! Image built at: $OUTPUT_ABS"
 
 # Cleanup
 if [ "$KEEP_DEF" = true ]; then
-    log "ℹ️  Definition file kept at: $TARGET_DEF"
-else
-    if [ -d "$TMP_DIR" ]; then
-        rm -rf "$TMP_DIR"
-    fi
+    FINAL_DEF="$OUTPUT_PARENT/$(basename "${OUTPUT%.*}").def"
+    mv "$TARGET_DEF" "$FINAL_DEF"
+    log "ℹ️  Definition file kept at: $FINAL_DEF"
+fi
+
+if [ -d "$TMP_DIR" ]; then
+    rm -rf "$TMP_DIR"
 fi
