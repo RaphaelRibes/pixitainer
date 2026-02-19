@@ -12,6 +12,7 @@ KEEP_DEF=false
 VERBOSE=false
 QUIET=false
 declare -a ENVS
+declare -a INCLUDES
 
 # --- Fonction d'aide ---
 usage() {
@@ -25,6 +26,7 @@ usage() {
     echo "  -p, --path PATH           Working directory (source project)"
     echo "  -s, --seamless            Enable seamless execution"
     echo "  -e, --env ENV             Specific environment(s) to install (can be used multiple times)"
+    echo "  -i, --include PATH        Additional file/directory to include (can be used multiple times)"
     echo "  -q, --quiet               Quiet mode (suppress all output, return 0 on success, 1 on error)"
     echo "  -v, --verbose             Verbose mode (show full Apptainer build output)"
     echo "  --base-image IMAGE        Specify base image (default: ubuntu:24.04)"
@@ -57,6 +59,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -e|--env)
             ENVS+=("$2")
+            shift 2
+            ;;
+        -i|--include)
+            INCLUDES+=("$2")
             shift 2
             ;;
         -q|--quiet)
@@ -129,6 +135,26 @@ FILES_SECTION="    \"$PIXI_TOML\" /opt/conf/pixi.toml"
 if [ -f "$PIXI_LOCK" ]; then
     FILES_SECTION="$FILES_SECTION"$'\n'"    \"$PIXI_LOCK\" /opt/conf/pixi.lock"
 fi
+
+# Include additional files/directories specified with --include
+for inc in "${INCLUDES[@]}"; do
+    # Resolve to absolute path (relative to project directory)
+    if [[ "$inc" = /* ]]; then
+        INC_PATH="$inc"
+    else
+        INC_PATH="$WD/$inc"
+    fi
+
+    if [ -e "$INC_PATH" ]; then
+        # Get the basename for the destination
+        INC_BASENAME=$(basename "$INC_PATH")
+        FILES_SECTION="$FILES_SECTION"$'\n'"    \"$INC_PATH\" /opt/conf/$INC_BASENAME"
+    else
+        if [ "$QUIET" = false ]; then
+            echo "Warning: --include path not found: $inc"
+        fi
+    fi
+done
 
 # Construction de la commande d'installation
 if [ ${#ENVS[@]} -gt 0 ]; then
