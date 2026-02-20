@@ -704,7 +704,7 @@ packages:
   timestamp: 1769557678657
 - conda: .
   name: pixitainer
-  version: '0.4'
+  version: 0.5.0
   build: hd418a6e_0
   subdir: noarch
   variants:

@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-PIXITAINER_VERSION="0.4"
+PIXITAINER_VERSION="0.5.0"
 
 # --- Valeurs par défaut ---
 OUTPUT="pixitainer.sif"
@@ -8,6 +8,7 @@ PROJECT_PATH="."
 SEAMLESS=false
 BASE_IMAGE="ubuntu:24.04"
 TARGET_PIXI_VERSION=""
+LATEST_PIXI=false
 KEEP_DEF=false
 VERBOSE=false
 QUIET=false
@@ -15,6 +16,7 @@ NO_INSTALL=false
 declare -a ENVS
 declare -a EXTRA_FILES
 declare -a POST_COMMANDS
+declare -a LABELS
 
 # --- Fonction d'aide ---
 usage() {
@@ -23,19 +25,34 @@ usage() {
     echo "Pixi extension to containerize a project with Apptainer."
     echo "Version: $PIXITAINER_VERSION"
     echo ""
-    echo "Options:"
+
+    echo "Core Options:"
     echo "  -o, --output OUTPUT       Output image path (default: pixitainer.sif)"
     echo "  -p, --path PATH           Working directory (source project)"
     echo "  -s, --seamless            Enable seamless execution"
+    echo ""
+
+    echo "Environment & Image Setup:"
+    echo "  -b, --base-image IMAGE    Specify base image (default: ubuntu:24.04)"
     echo "  -e, --env ENV             Specific environment(s) to install (can be used multiple times)"
+    echo "  -n, --no-install          Do not install any environments"
+    echo ""
+
+    echo "Pixi Versioning:"
+    echo "  -V, --pixi-version VER    Specify pixi version (default: latest)"
+    echo "  -L, --latest              Force the use of the latest pixi version (cannot be used with -V)"
+    echo ""
+
+    echo "Advanced Modifications:"
+    echo "  -a, --add-file SRC:DEST   Add a file to the container (format: source:destination)"
+    echo "  -c, --post-command CMD    Add a command to run in %post section (can be used multiple times)"
+    echo "  -l, --label KEY:VALUE     Add a custom label to the image (can be used multiple times)"
+    echo "  -k, --keep-def            Export the .def file (do not delete temporary files)"
+    echo ""
+
+    echo "General Options:"
     echo "  -q, --quiet               Quiet mode (suppress all output, return 0 on success, 1 on error)"
     echo "  -v, --verbose             Verbose mode (show full Apptainer build output)"
-    echo "  --base-image IMAGE        Specify base image (default: ubuntu:24.04)"
-    echo "  --pixi-version VERSION    Specify pixi version (default: latest)"
-    echo "  --add-file SRC:DEST       Add a file to the container (format: source:destination)"
-    echo "  --post-command CMD        Add a command to run in %post section (can be used multiple times)"
-    echo "  --keep-def                Export the .def file (do not delete temporary files)"
-    echo "  --no-install              Do not install any environments"
     echo "  -h, --help                Show this help message"
 }
 
@@ -49,6 +66,7 @@ log() {
 # --- Parsing des arguments ---
 while [[ $# -gt 0 ]]; do
     case $1 in
+        # Core Options
         -o|--output)
             OUTPUT="$2"
             shift 2
@@ -61,41 +79,56 @@ while [[ $# -gt 0 ]]; do
             SEAMLESS=true
             shift
             ;;
+
+        # Environment & Image Setup
+        -b|--base-image)
+            BASE_IMAGE="$2"
+            shift 2
+            ;;
         -e|--env)
             ENVS+=("$2")
             shift 2
             ;;
+        -n|--no-install)
+            NO_INSTALL=true
+            shift
+            ;;
+
+        # Pixi Versioning
+        -V|--pixi-version)
+            TARGET_PIXI_VERSION="$2"
+            shift 2
+            ;;
+        -L|--latest)
+            LATEST_PIXI=true
+            shift
+            ;;
+
+        # Advanced Modifications
+        -a|--add-file)
+            EXTRA_FILES+=("$2")
+            shift 2
+            ;;
+        -c|--post-command)
+            POST_COMMANDS+=("$2")
+            shift 2
+            ;;
+        -l|--label)
+            LABELS+=("$2")
+            shift 2
+            ;;
+        -k|--keep-def)
+            KEEP_DEF=true
+            shift
+            ;;
+
+        # General Options
         -q|--quiet)
             QUIET=true
             shift
             ;;
         -v|--verbose)
             VERBOSE=true
-            shift
-            ;;
-        --base-image)
-            BASE_IMAGE="$2"
-            shift 2
-            ;;
-        --pixi-version)
-            TARGET_PIXI_VERSION="$2"
-            shift 2
-            ;;
-        --add-file)
-
-            EXTRA_FILES+=("$2")
-            shift 2
-            ;;
-        --post-command)
-            POST_COMMANDS+=("$2")
-            shift 2
-            ;;
-        --keep-def)
-            KEEP_DEF=true
-            shift
-            ;;
-        --no-install)
-            NO_INSTALL=true
             shift
             ;;
         -h|--help)
@@ -109,6 +142,12 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# --- Vérification de compatibilité des arguments ---
+if [ "$LATEST_PIXI" = true ] && [ -n "$TARGET_PIXI_VERSION" ]; then
+    echo "Error: The --latest flag cannot be used at the same time as --pixi-version."
+    exit 1
+fi
 
 # --- Résolution des chemins ---
 WD=$(cd "$PROJECT_PATH" && pwd -P)
@@ -193,15 +232,35 @@ fi
 
 # Gestion de la version de Pixi
 PIXI_VERSION_ENV=""
+PIXI_VERSION=$(pixi -V | grep -o " .*$")
+
 if [ -n "$TARGET_PIXI_VERSION" ]; then
     PIXI_VERSION_ENV="pixi self-update --version $TARGET_PIXI_VERSION"
+    PIXI_VERSION="$TARGET_PIXI_VERSION"
+elif [ "$LATEST_PIXI" = true ]; then
+    PIXI_VERSION_ENV=""
+    PIXI_VERSION=$(curl -s https://api.github.com/repos/prefix-dev/pixi/releases/latest | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/')
+else
+    PIXI_VERSION_ENV="pixi self-update --version $PIXI_VERSION"
 fi
+
+# Formatage des labels personnalisés pour Apptainer
+CUSTOM_LABELS_SECTION=""
+for label in "${LABELS[@]}"; do
+    formatted_label="${label/:/ }"
+    CUSTOM_LABELS_SECTION="$CUSTOM_LABELS_SECTION"$'\n'"    $formatted_label"
+done
 
 # Écriture du fichier de définition (Here-Doc)
 # Note: We inject "STEP:" echoes to track progress in non-verbose mode
 cat <<EOF > "$TARGET_DEF"
 Bootstrap: docker
 From: $BASE_IMAGE
+
+%labels
+    Created_With Pixitainer (https://github.com/RaphaelRibes/pixitainer)
+    Pixitainer_Version $PIXITAINER_VERSION
+    Pixi_Version $PIXI_VERSION$CUSTOM_LABELS_SECTION
 
 %files
 $FILES_SECTION

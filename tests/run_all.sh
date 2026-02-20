@@ -103,6 +103,8 @@ run_test_isolated() {
 
 # --- Launch Tests ---
 run_test_isolated "test_defaults.sh"
+run_test_isolated "test_latest.sh"
+run_test_isolated "test_label.sh"
 run_test_isolated "test_seamless.sh"
 run_test_isolated "test_env.sh"
 run_test_isolated "test_base_image.sh"
