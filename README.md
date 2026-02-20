@@ -27,6 +27,7 @@ Because Apptainer is hosted by the Linux Foundation, it is designed specifically
 ## How ?
 
 The best thing to do will be to add this way as a [pixi extension](https://pixi.sh/latest/integration/extensions/introduction/), so we just have to type `pixi containerize`, some option and tada !
+> Note that pixitainer will install pixi with the same version that you have on your machine, you can change it with options look just down below.
 
 TODO:
 
