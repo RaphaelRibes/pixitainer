@@ -1,6 +1,6 @@
 # Pixitainer
 
-![Version](https://img.shields.io/badge/Version-0.3.4-blue)
+![Version](https://img.shields.io/badge/Version-0.4-blue)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![License](https://img.shields.io/badge/Licence-BSD--3--Clause-green)](LICENSE)
 [![Forge](https://img.shields.io/badge/Forge-Prefix.dev--Forge-yellow)](https://prefix.dev/channels/raphaelribes/packages/pixitainer)
