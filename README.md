@@ -1,6 +1,6 @@
 # Pixitainer
 
-![Version](https://img.shields.io/badge/Version-0.4-blue)
+![Version](https://img.shields.io/badge/Version-0.5.0-blue)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![License](https://img.shields.io/badge/Licence-BSD--3--Clause-green)](LICENSE)
 [![Forge](https://img.shields.io/badge/Forge-Prefix.dev--Forge-yellow)](https://prefix.dev/channels/raphaelribes/packages/pixitainer)
@@ -33,19 +33,25 @@ TODO:
 - [x] Receipe that works.
 - [x] Pixi package that I can add as an extension.
 - [x] Adding options to the extension.
-  - [x] Build options
+  - [x] Core Options
     - [x] Output image path (`-o`, `--output`)
     - [x] Working directory (`-p`, `--path`)
     - [x] Enable seamless execution (`-s`, `--seamless`)
+  - [x] Environment & Image Setup
+    - [x] Specify base image (`-b`, `--base-image`)
     - [x] Specific environment selection (`-e`, `--env`)
-    - [x] Verbose mode (`-v`, `--verbose`)
+    - [x] No installation of environment in the container (`-n`, `--no-install`)
+  - [x] Pixi Versioning
+    - [x] Specify pixi version (`-V`, `--pixi-version`)
+    - [x] Latest pixi version (`-L`, `--latest`)
+  - [x] Advanced Modifications
+    - [x] Add extra files/folders (`-a`, `--add-file`)
+    - [x] Run extra post commands (`-c`, `--post-command`)
+    - [x] Add extra labels (`-l`, `--label`)
+    - [x] Export the `.def` file (`-k`, `--keep-def`)
+  - [x] General Options
     - [x] Quiet mode (`-q`, `--quiet`)
-    - [x] Specify base image (`--base-image`)
-    - [x] Specify pixi version (`--pixi-version`)
-    - [x] Add extra files/folders (`--add-file`)
-    - [x] Export the `.def` file (`--keep-def`)
-    - [x] No installation of environment in the container (`--no-install`)
-    - [x] Run extra post commands (`--post-command`)
+    - [x] Verbose mode (`-v`, `--verbose`)
 - [ ] Support of container solutions
   - [x] Apptainer
   - [ ] Singularity
