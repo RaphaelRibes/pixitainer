@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-PIXITAINER_VERSION="0.3.5"
+PIXITAINER_VERSION="0.4"
 
 # --- Valeurs par défaut ---
 OUTPUT="pixitainer.sif"
@@ -125,16 +125,20 @@ else
 fi
 
 TMP_DIR="$OUTPUT_PARENT/.tmp_pixitainer"
-PIXI_TOML="$WD/pixi.toml"
-PIXI_LOCK="$WD/pixi.lock"
-
-# --- Vérifications ---
-if [ ! -f "$PIXI_TOML" ]; then
+if [ -f "$WD/pixi.toml" ]; then
+    MANIFEST_SRC="$WD/pixi.toml"
+    MANIFEST_DEST="/opt/conf/pixi.toml"
+elif [ -f "$WD/pyproject.toml" ]; then
+    MANIFEST_SRC="$WD/pyproject.toml"
+    MANIFEST_DEST="/opt/conf/pyproject.toml"
+else
     if [ "$QUIET" = false ]; then
-        echo "Error: pixi.toml not found in $WD"
+        echo "Error: Neither pixi.toml nor pyproject.toml found in $WD"
     fi
     exit 1
 fi
+
+PIXI_LOCK="$WD/pixi.lock"
 
 log "📦 Containerizing project from: $WD"
 log "📂 Output target: $OUTPUT_ABS"
@@ -146,7 +150,7 @@ DEF_NAME="$(basename "${OUTPUT%.*}").def"
 TARGET_DEF="$TMP_DIR/$DEF_NAME"
 
 # Construction de la section %files
-FILES_SECTION="    \"$PIXI_TOML\" /opt/conf/pixi.toml"
+FILES_SECTION="    \"$MANIFEST_SRC\" $MANIFEST_DEST"
 if [ -f "$PIXI_LOCK" ]; then
     FILES_SECTION="$FILES_SECTION"$'\n'"    \"$PIXI_LOCK\" /opt/conf/pixi.lock"
 fi
@@ -182,7 +186,7 @@ fi
 # Logique Seamless
 if [ "$SEAMLESS" = true ]; then
     log "ℹ️  Seamless mode enabled"
-    RUNSCRIPT_CONTENT='pixi run --as-is -m /opt/conf/pixi.toml "$@"'
+    RUNSCRIPT_CONTENT="pixi run --as-is -m $MANIFEST_DEST \"\$@\""
 else
     RUNSCRIPT_CONTENT='exec "$@"'
 fi
@@ -204,7 +208,7 @@ $FILES_SECTION
 
 %environment
     export PIXI_HOME=/opt/pixi
-    export PIXI_PROJECT_MANIFEST=/opt/conf/pixi.toml
+    export PIXI_PROJECT_MANIFEST=$MANIFEST_DEST
     export PATH="/opt/pixi/bin:\$PATH"
 
 %post
