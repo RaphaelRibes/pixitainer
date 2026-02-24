@@ -53,6 +53,7 @@ TODO:
   - [x] General Options
     - [x] Quiet mode (`-q`, `--quiet`)
     - [x] Verbose mode (`-v`, `--verbose`)
+- [ ] Support the options in a `[tools.pixitainer]` table in the manifest
 - [ ] Support of container solutions
   - [x] Apptainer
   - [ ] Singularity
