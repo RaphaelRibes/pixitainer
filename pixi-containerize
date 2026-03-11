@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-PIXITAINER_VERSION="0.5.0"
+PIXITAINER_VERSION="0.6.0"
 
 # --- Valeurs par défaut ---
 OUTPUT="pixitainer.sif"
@@ -62,6 +62,93 @@ log() {
         echo "$@"
     fi
 }
+
+# --- Pre-parsing du chemin pour trouver le manifeste ---
+for ((i=1; i<=$#; i++)); do
+    if [[ "${!i}" == "-p" ]] || [[ "${!i}" == "--path" ]]; then
+        next=$((i+1))
+        PROJECT_PATH="${!next}"
+        break
+    fi
+done
+
+TOML_WD=$(cd "$PROJECT_PATH" 2>/dev/null && pwd -P || echo "$PROJECT_PATH")
+if [ -f "$TOML_WD/pixi.toml" ]; then
+    PRE_MANIFEST_SRC="$TOML_WD/pixi.toml"
+elif [ -f "$TOML_WD/pyproject.toml" ]; then
+    PRE_MANIFEST_SRC="$TOML_WD/pyproject.toml"
+else
+    PRE_MANIFEST_SRC=""
+fi
+
+# --- Lecture des configurations TOML ---
+if [ -n "$PRE_MANIFEST_SRC" ]; then
+    while IFS="|" read -r key val; do
+        if [ -z "$key" ]; then continue; fi
+        clean_val=$(echo "$val" | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+        
+        case "$key" in
+            output) OUTPUT="$clean_val" ;;
+            path) PROJECT_PATH="$clean_val" ;;
+            seamless) 
+                if [[ "${clean_val,,}" == "true" ]]; then SEAMLESS=true; else SEAMLESS=false; fi ;;
+            base-image) BASE_IMAGE="$clean_val" ;;
+            no-install) 
+                if [[ "${clean_val,,}" == "true" ]]; then NO_INSTALL=true; else NO_INSTALL=false; fi ;;
+            pixi-version) TARGET_PIXI_VERSION="$clean_val" ;;
+            latest) 
+                if [[ "${clean_val,,}" == "true" ]]; then LATEST_PIXI=true; else LATEST_PIXI=false; fi ;;
+            keep-def) 
+                if [[ "${clean_val,,}" == "true" ]]; then KEEP_DEF=true; else KEEP_DEF=false; fi ;;
+            quiet) 
+                if [[ "${clean_val,,}" == "true" ]]; then QUIET=true; else QUIET=false; fi ;;
+            verbose) 
+                if [[ "${clean_val,,}" == "true" ]]; then VERBOSE=true; else VERBOSE=false; fi ;;
+            env|add-file|post-command|label)
+                elements=$(echo "$val" | grep -o '"[^"]*"')
+                while read -r elem; do
+                    if [ -n "$elem" ]; then
+                        elem_clean="${elem//\"/}"
+                        case "$key" in
+                            env) ENVS+=("$elem_clean") ;;
+                            add-file) EXTRA_FILES+=("$elem_clean") ;;
+                            post-command) POST_COMMANDS+=("$elem_clean") ;;
+                            label) LABELS+=("$elem_clean") ;;
+                        esac
+                    fi
+                done <<< "$elements"
+                ;;
+        esac
+    done < <(awk '
+    /^\[tool\.pixitainer\]/ { flag=1; next }
+    /^\[/ { flag=0 }
+    flag {
+        sub(/#.*/, "")
+        gsub(/^[ \t]+|[ \t]+$/, "")
+        if (!length) next
+        
+        idx = index($0, "=")
+        if (!idx) {
+            match($0, /[ \t]+/)
+            if (RSTART) {
+                key = substr($0, 1, RSTART-1)
+                val = substr($0, RSTART+RLENGTH)
+            } else {
+                next
+            }
+        } else {
+            key = substr($0, 1, idx-1)
+            val = substr($0, idx+1)
+        }
+        
+        gsub(/^[ \t]+|[ \t]+$/, "", key)
+        gsub(/^[ \t]+|[ \t]+$/, "", val)
+        sub(/\r$/, "", key)
+        sub(/\r$/, "", val)
+        
+        print key "|" val
+    }' "$PRE_MANIFEST_SRC")
+fi
 
 # --- Parsing des arguments ---
 while [[ $# -gt 0 ]]; do
@@ -149,6 +236,13 @@ if [ "$LATEST_PIXI" = true ] && [ -n "$TARGET_PIXI_VERSION" ]; then
     exit 1
 fi
 
+if [ -n "$TARGET_PIXI_VERSION" ]; then
+    if ! printf '%s\n%s\n' "0.44.0" "$TARGET_PIXI_VERSION" | sort -V -c 2>/dev/null; then
+        echo "Error: Specified Pixi version must be 0.44.0 or newer."
+        exit 1
+    fi
+fi
+
 # --- Résolution des chemins ---
 WD=$(cd "$PROJECT_PATH" && pwd -P)
 # Pour l'output, on gère le cas où le fichier n'existe pas encore
@@ -211,7 +305,7 @@ done
 
 # Construction de la commande d'installation
 if [ "$NO_INSTALL" = true ]; then
-    INSTALL_CMD="echo 'Skipping environment installation'"
+    INSTALL_CMD="pixi run echo 'Skipping environment installation'"
 elif [ ${#ENVS[@]} -gt 0 ]; then
     ENV_FLAGS=""
     for env in "${ENVS[@]}"; do
@@ -225,7 +319,7 @@ fi
 # Logique Seamless
 if [ "$SEAMLESS" = true ]; then
     log "ℹ️  Seamless mode enabled"
-    RUNSCRIPT_CONTENT="pixi run --as-is -m $MANIFEST_DEST \"\$@\""
+    RUNSCRIPT_CONTENT="pixi run --locked --as-is -m $MANIFEST_DEST \"\$@\""
 else
     RUNSCRIPT_CONTENT='exec "$@"'
 fi
@@ -325,8 +419,6 @@ elif [ "$VERBOSE" = true ]; then
     # Verbose Mode: Run directly
     "${CMD[@]}"
 else
-    # Normal Mode: Spinner UI
-
     # Temp files
     LOG_FILE="$(mktemp)"
     STEP_FILE="$(mktemp)" # To track current step across subshells

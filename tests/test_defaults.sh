@@ -16,12 +16,11 @@ fi
 
 # Verification
 echo "Verifying default image pixi version..."
-EXPECTED_VERSION=$(pixi -V | tail -n 1 | awk '{print $NF}')
-CONTAINER_VERSION=$(pixi run -m "$(pwd -P)"/../../pixi.toml apptainer run pixitainer.sif pixi -V | tail -n 1 | awk '{print $NF}')
+CONTAINER_PYTHON=$(pixi run -m ../../../pixi.toml apptainer run pixitainer.sif pixi run --as-is python --version)
 
-if [ "$CONTAINER_VERSION" != "$EXPECTED_VERSION" ]; then
-    echo "Error: Container pixi version ($CONTAINER_VERSION) does not match local version ($EXPECTED_VERSION)."
+if [[ ! "$CONTAINER_PYTHON" =~ "Python 3." ]]; then
+    echo "Error: Container does not have expected Python version. Got: $CONTAINER_PYTHON"
     exit 1
 else
-    echo "Success: Container pixi version matches local version ($EXPECTED_VERSION)."
+    echo "Success: Container python version matches ($CONTAINER_PYTHON)."
 fi

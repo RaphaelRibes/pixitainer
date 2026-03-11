@@ -20,4 +20,11 @@ fi
 echo "Success: Definition file found at $DEF_FILE"
 
 # Verification
-pixi run -m ../../../pixi.toml apptainer run "$IMAGE_NAME" pixi run --as-is -m /opt/conf/pixi.toml "echo \$(pixi -V)"
+CONTAINER_PYTHON=$(pixi run -m ../../../pixi.toml apptainer run "$IMAGE_NAME" pixi run --as-is python --version)
+
+if [[ ! "$CONTAINER_PYTHON" =~ "Python 3." ]]; then
+    echo "Error: Container does not have expected Python version. Got: $CONTAINER_PYTHON"
+    exit 1
+else
+    echo "Success: Container python version matches ($CONTAINER_PYTHON)."
+fi

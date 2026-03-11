@@ -1,13 +1,7 @@
 #!/bin/bash
 set -e
 
-# If PIXI_CMD is not set, we assume standalone execution
-if [ -z "$PIXI_CMD" ]; then
-    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-    PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-    PIXI_CMD="$PROJECT_ROOT/pixi-containerize"
-    REPO_DIR="$PROJECT_ROOT"
-fi
+
 
 cd "$REPO_DIR"
 
@@ -25,7 +19,7 @@ if [ ! -f "$IMAGE_NAME" ]; then
 fi
 
 echo "Verifying file creation from post command..."
-if apptainer exec "$IMAGE_NAME" ls /opt/conf/post_cmd_success > /dev/null 2>&1; then
+if pixi run -m ../../../pixi.toml apptainer exec "$IMAGE_NAME" ls /opt/conf/post_cmd_success > /dev/null 2>&1; then
     echo "Success: Post command executed correctly."
 else
     echo "Error: Post command failed (file not found)."

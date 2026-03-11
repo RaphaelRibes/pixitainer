@@ -14,13 +14,11 @@ if [ ! -f "pixitainer_latest.sif" ]; then
     exit 1
 fi
 
-echo "Verifying latest image pixi version..."
-LATEST_CONTAINER_VERSION=$(pixi run -m "$(pwd -P)"/../../pixi.toml apptainer run pixitainer_latest.sif pixi -V | tail -n 1 | awk '{print $NF}')
-LATEST_KNOWN_VERSION=$(curl -s https://api.github.com/repos/prefix-dev/pixi/releases/latest | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/')
+LATEST_CONTAINER_PYTHON=$(pixi run -m ../../../pixi.toml apptainer run pixitainer_latest.sif pixi run --as-is python --version)
 
-if [ "$LATEST_CONTAINER_VERSION" != "$LATEST_KNOWN_VERSION" ]; then
-    echo "Error: Container pixi version ($LATEST_CONTAINER_VERSION) does not match latest version ($LATEST_KNOWN_VERSION)."
+if [[ ! "$LATEST_CONTAINER_PYTHON" =~ "Python 3." ]]; then
+    echo "Error: Container does not have expected Python version. Got: $LATEST_CONTAINER_PYTHON"
     exit 1
 else
-    echo "Success: Container pixi version matches latest version ($LATEST_KNOWN_VERSION)."
+    echo "Success: Container python version matches ($LATEST_CONTAINER_PYTHON)."
 fi

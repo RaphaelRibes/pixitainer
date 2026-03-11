@@ -17,8 +17,14 @@ fi
 
 # Verification
 echo "Verifying base image build..."
-pixi run -m ../../../pixi.toml apptainer run "$IMAGE_NAME" pixi run --as-is -m /opt/conf/pixi.toml "echo \$(pixi -V)"
+CONTAINER_PYTHON=$(pixi run -m ../../../pixi.toml apptainer run "$IMAGE_NAME" pixi run --as-is python --version)
 
+if [[ ! "$CONTAINER_PYTHON" =~ "Python 3." ]]; then
+    echo "Error: Container does not have expected Python version. Got: $CONTAINER_PYTHON"
+    exit 1
+else
+    echo "Success: Container python version matches ($CONTAINER_PYTHON)."
+fi
 echo "Testing invalid base-image option (should fail)..."
 if $PIXI_CMD -o "should_fail.sif" --base-image "this_image_does_not_exist:really" 2>/dev/null; then
     echo "Error: Command succeeded but should have failed with invalid base image."
