@@ -16,8 +16,15 @@ if [ ! -f "$IMAGE_NAME" ]; then
 fi
 
 # Verification
-echo "Verifying env image..."
-pixi run -m ../../../pixi.toml apptainer run "$IMAGE_NAME" pixi run --as-is -m /opt/conf/pixi.toml "echo \$(pixi -V)"
+echo "Verifying env image build..."
+CONTAINER_PYTHON=$(pixi run -m ../../../pixi.toml apptainer run "$IMAGE_NAME" pixi run --as-is python --version)
+
+if [[ ! "$CONTAINER_PYTHON" =~ "Python 3." ]]; then
+    echo "Error: Container does not have expected Python version. Got: $CONTAINER_PYTHON"
+    exit 1
+else
+    echo "Success: Container python version matches ($CONTAINER_PYTHON)."
+fi
 
 echo "Testing invalid environment option (should fail)..."
 if $PIXI_CMD -o "should_fail.sif" -e "non_existent_env_12345" 2>/dev/null; then

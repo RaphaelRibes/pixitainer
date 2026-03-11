@@ -39,4 +39,4 @@ fi
 
 # Verification
 echo "Verifying image..."
-pixi run -m "$(pwd -P)"/../../pixi.toml apptainer run pixitainer.sif pixi run --as-is -m /opt/conf/pyproject.toml hello | grep "Hello from pyproject"
+pixi run -m ../../../pixi.toml apptainer run pixitainer.sif pixi run --as-is -m /opt/conf/pyproject.toml hello | grep "Hello from pyproject"

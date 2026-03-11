@@ -8,7 +8,15 @@ echo "Hello World" > "$EXTRA_FILE"
 
 echo "Testing --add-file option..."
 OUTPUT_LOG="add_file_log.txt"
+set +e
 $PIXI_CMD -o "$IMAGE_NAME" --add-file "$EXTRA_FILE:/opt/extra.txt" > "$OUTPUT_LOG" 2>&1
+EXIT_CODE=$?
+set -e
+
+if [ $EXIT_CODE -ne 0 ]; then
+    cat "$OUTPUT_LOG"
+    exit $EXIT_CODE
+fi
 
 # Check for log output
 if ! grep -q "Adding file: $EXTRA_FILE -> /opt/extra.txt" "$OUTPUT_LOG"; then
