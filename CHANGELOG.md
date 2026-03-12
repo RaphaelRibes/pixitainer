@@ -1,3 +1,10 @@
+## [0.6.1] - 2026-03-12
+
+### 🚀 Features
+
+- Pixitainer now tries to get the user OS version to use the correct base image by default.
+- If it can't, it falls back to `ubuntu:24.04` and prints a warning
+
 ## [0.6.0] - 2026-03-11
 
 ### 🚀 Features

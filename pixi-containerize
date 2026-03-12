@@ -1,12 +1,32 @@
 #!/bin/bash
 set -e
-PIXITAINER_VERSION="0.6.0"
+PIXITAINER_VERSION="0.6.1"
+
+# Wrapper to echo only if not quiet
+log() {
+    if [ "$QUIET" = false ]; then
+        echo "$@"
+    fi
+}
 
 # --- Valeurs par défaut ---
 OUTPUT="pixitainer.sif"
 PROJECT_PATH="."
 SEAMLESS=false
-BASE_IMAGE="ubuntu:24.04"
+
+if [ -f /etc/os-release ]; then
+    source /etc/os-release
+
+    if [ -z "$VERSION_ID" ]; then
+        BASE_IMAGE="${ID}:latest"
+    else
+        BASE_IMAGE="${ID}:${VERSION_ID}"
+    fi
+else
+    echo "⚠️  Warning: /etc/os-release not found. Defaulting to ubuntu:24.04 as base image."
+    BASE_IMAGE="ubuntu:24.04"
+fi
+
 TARGET_PIXI_VERSION=""
 LATEST_PIXI=false
 KEEP_DEF=false
@@ -54,13 +74,6 @@ usage() {
     echo "  -q, --quiet               Quiet mode (suppress all output, return 0 on success, 1 on error)"
     echo "  -v, --verbose             Verbose mode (show full Apptainer build output)"
     echo "  -h, --help                Show this help message"
-}
-
-# Wrapper to echo only if not quiet
-log() {
-    if [ "$QUIET" = false ]; then
-        echo "$@"
-    fi
 }
 
 # --- Pre-parsing du chemin pour trouver le manifeste ---
