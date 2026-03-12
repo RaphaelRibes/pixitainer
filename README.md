@@ -150,7 +150,7 @@ pixi containerize -o custom_output.sif
 
 ## Known problems
 
-## Pathing is... strange?
+### Pathing is... strange?
 
 When launching a command in the pixi shell, the `cwd` of tasks will be changed into the one of the pixi workplace (`PIXI_PROJECT_ROOT`).
 
@@ -170,7 +170,7 @@ What you want is to run pixi in the `INIT_CWD` so take the time to change your `
 > However, be conscious that your outputs will also be in `/opt/conf` and not in your current working directory.
 > Since you cannot write in a container, you will have to specify the outputs with `$INIT_CWD` and bind the folder where you want your outputs to be.
 >
-## Read-only file system (os error 30)
+### Read-only file system (os error 30)
 
 This is related to the previous problem: pixi is using `PIXI_PROJECT_ROOT` as the `cwd`.
 It's going to try to write in `/opt/conf` wich is not allowed because the sif image is in read only.
@@ -217,3 +217,7 @@ TODO:
 - [x] Testings.
 - [x] Publish
 - [ ] Go back to step 3 until WW3, messiah or death of the internet
+
+
+## License
+Pixitainer is licensed under the BSD 3-Clause License. See the [LICENSE](LICENSE) file for more details.
