@@ -36,7 +36,7 @@ Because Apptainer is hosted by the Linux Foundation, it is designed specifically
 curl -fsSL https://pixi.sh/install.sh | sh
 ```
 
-## User
+### User
 
 Install pixitainer globaly on pixi:
 
@@ -44,7 +44,7 @@ Install pixitainer globaly on pixi:
 pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer
 ```
 
-## Developer
+### Developer
 
 1. Clone this repo
 
@@ -79,7 +79,7 @@ We put ourselves in an environment with one task defined like
 make_dir = 'mkdir testdir'
 ```
 
-## Manually
+### Manually
 
 You can also build the container manually with apptainer
 
@@ -97,7 +97,7 @@ We add `--as-is` to make sure it sticks to the `pixi.lock` file and it only uses
 
 > **WARNING**: `-m /opt/conf/pixi.toml` is mandatory or pixi will use the default one in your current working directory.
 
-## Seamlessly
+### Seamlessly
 
 Just use the pixitainer extension command after installing it with the seamless option (`-s`, `--seamless`).
 
