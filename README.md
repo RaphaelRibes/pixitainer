@@ -53,13 +53,13 @@ git clone https://github.com/RaphaelRibes/pixitainer.git
 cd pixitainer
 ```
 
-1. Build the pixitainer extension
+2. Build the pixitainer extension
 
 ```bash
 pixi build
 ```
 
-1. Install the pixitainer extension
+3. Install the pixitainer extension
 
 ```bash
 pixi global install pixitainer --path *.conda --channel conda-forge
