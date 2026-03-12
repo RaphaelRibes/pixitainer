@@ -81,8 +81,6 @@ make_dir = 'mkdir testdir'
 
 ### Manually
 
-You can also build the container manually with apptainer
-
 ```bash
 pixi containerize
 ```
@@ -93,7 +91,7 @@ Then you can use pixi in your image
 apptainer run -f pixitainer.sif pixi run --as-is -m /opt/conf/pixi.toml make_dir
 ```
 
-We add `--as-is` to make sure it sticks to the `pixi.lock` file and it only uses the installed binaries and doesn't try to install others.
+We add `--as-is` to make sure it sticks to the `pixi.lock` file, and it only uses the installed binaries and doesn't try to install others.
 
 > **WARNING**: `-m /opt/conf/pixi.toml` is mandatory or pixi will use the default one in your current working directory.
 
@@ -117,7 +115,7 @@ apptainer run -f pixitainer.sif make_dir
 > pixi run --as-is -m /opt/conf/pixi.toml "$@"
 > ```
 >
-> Meaning that you only have access to `pixi run` and nothing else.
+> Meaning that you only have access to `pixi run`.
 
 ## TOML Configuration
 
