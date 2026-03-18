@@ -32,8 +32,6 @@ if [ ! -f "toml_path.sif" ]; then
 fi
 
 echo "Verifying Python inside toml_path.sif..."
-APPTAINER_CMD="pixi run -m ../../../pixi.toml apptainer"
-
-$APPTAINER_CMD run toml_path.sif python --version | grep "Python 3."
+$CONTAINER_CMD run toml_path.sif python --version | grep "Python 3."
 
 echo "Path TOML configuration verified successfully."

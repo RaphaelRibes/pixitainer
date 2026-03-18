@@ -32,7 +32,7 @@ fi
 
 # Verification inside container
 echo "Verifying file inside container..."
-CONTENT=$(pixi run -m ../../../pixi.toml apptainer exec "$IMAGE_NAME" cat /opt/extra.txt)
+CONTENT=$($CONTAINER_CMD exec "$IMAGE_NAME" cat /opt/extra.txt)
 
 if [ "$CONTENT" != "Hello World" ]; then
     echo "Error: File content mismatch. Expected 'Hello World', got '$CONTENT'"

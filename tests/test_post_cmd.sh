@@ -19,7 +19,7 @@ if [ ! -f "$IMAGE_NAME" ]; then
 fi
 
 echo "Verifying file creation from post command..."
-if pixi run -m ../../../pixi.toml apptainer exec "$IMAGE_NAME" ls /opt/conf/post_cmd_success > /dev/null 2>&1; then
+if $CONTAINER_CMD exec "$IMAGE_NAME" ls /opt/conf/post_cmd_success > /dev/null 2>&1; then
     echo "Success: Post command executed correctly."
 else
     echo "Error: Post command failed (file not found)."
