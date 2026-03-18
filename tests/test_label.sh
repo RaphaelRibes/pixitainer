@@ -15,8 +15,8 @@ if [ ! -f "pixitainer.sif" ]; then
 fi
 
 echo "Verifying labels in the image..."
-# Extract the labels using apptainer inspect
-LABELS_OUTPUT=$(pixi run -m ../../../pixi.toml apptainer inspect pixitainer.sif)
+# Extract the labels using the container tool's inspect
+LABELS_OUTPUT=$($CONTAINER_CMD inspect pixitainer.sif)
 
 if ! echo "$LABELS_OUTPUT" | grep -q "HelloWorld"; then
     echo "Error: MY_LABEL:HelloWorld is not present in the image."

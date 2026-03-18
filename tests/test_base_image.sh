@@ -17,7 +17,7 @@ fi
 
 # Verification
 echo "Verifying base image build..."
-CONTAINER_PYTHON=$(pixi run -m ../../../pixi.toml apptainer run "$IMAGE_NAME" pixi run --as-is python --version)
+CONTAINER_PYTHON=$($CONTAINER_CMD run "$IMAGE_NAME" pixi run --as-is python --version)
 
 if [[ ! "$CONTAINER_PYTHON" =~ "Python 3." ]]; then
     echo "Error: Container does not have expected Python version. Got: $CONTAINER_PYTHON"

@@ -1,0 +1,509 @@
+#!/bin/bash
+set -e
+PIXITAINER_VERSION="0.6.1"
+
+# Wrapper to echo only if not quiet
+log() {
+    if [ "$QUIET" = false ]; then
+        echo "$@"
+    fi
+}
+
+# --- Valeurs par défaut ---
+OUTPUT="pixitainer.sif"
+PROJECT_PATH="."
+SEAMLESS=false
+
+if [ -f /etc/os-release ]; then
+    source /etc/os-release
+
+    if [ -z "$VERSION_ID" ]; then
+        BASE_IMAGE="${ID}:latest"
+    else
+        BASE_IMAGE="${ID}:${VERSION_ID}"
+    fi
+else
+    echo "⚠️  Warning: /etc/os-release not found. Defaulting to ubuntu:24.04 as base image."
+    BASE_IMAGE="ubuntu:24.04"
+fi
+
+TARGET_PIXI_VERSION=""
+LATEST_PIXI=false
+KEEP_DEF=false
+VERBOSE=false
+QUIET=false
+NO_INSTALL=false
+declare -a ENVS
+declare -a EXTRA_FILES
+declare -a POST_COMMANDS
+declare -a LABELS
+
+# --- Fonction d'aide ---
+usage() {
+    echo "Usage: pixi containerize [options]"
+    echo ""
+    echo "Pixi extension to containerize a project with Singularity."
+    echo "Version: $PIXITAINER_VERSION"
+    echo ""
+
+    echo "Core Options:"
+    echo "  -o, --output OUTPUT       Output image path (default: pixitainer.sif)"
+    echo "  -p, --path PATH           Working directory (source project)"
+    echo "  -s, --seamless            Enable seamless execution"
+    echo ""
+
+    echo "Environment & Image Setup:"
+    echo "  -b, --base-image IMAGE    Specify base image (default: ubuntu:24.04)"
+    echo "  -e, --env ENV             Specific environment(s) to install (can be used multiple times)"
+    echo "  -n, --no-install          Do not install any environments"
+    echo ""
+
+    echo "Pixi Versioning:"
+    echo "  -V, --pixi-version VER    Specify pixi version (default: latest)"
+    echo "  -L, --latest              Force the use of the latest pixi version (cannot be used with -V)"
+    echo ""
+
+    echo "Advanced Modifications:"
+    echo "  -a, --add-file SRC:DEST   Add a file to the container (format: source:destination)"
+    echo "  -c, --post-command CMD    Add a command to run in %post section (can be used multiple times)"
+    echo "  -l, --label KEY:VALUE     Add a custom label to the image (can be used multiple times)"
+    echo "  -k, --keep-def            Export the .def file (do not delete temporary files)"
+    echo ""
+
+    echo "General Options:"
+    echo "  -q, --quiet               Quiet mode (suppress all output, return 0 on success, 1 on error)"
+    echo "  -v, --verbose             Verbose mode (show full Singularity build output)"
+    echo "  -h, --help                Show this help message"
+}
+
+# --- Pre-parsing du chemin pour trouver le manifeste ---
+for ((i=1; i<=$#; i++)); do
+    if [[ "${!i}" == "-p" ]] || [[ "${!i}" == "--path" ]]; then
+        next=$((i+1))
+        PROJECT_PATH="${!next}"
+        break
+    fi
+done
+
+TOML_WD=$(cd "$PROJECT_PATH" 2>/dev/null && pwd -P || echo "$PROJECT_PATH")
+if [ -f "$TOML_WD/pixi.toml" ]; then
+    PRE_MANIFEST_SRC="$TOML_WD/pixi.toml"
+elif [ -f "$TOML_WD/pyproject.toml" ]; then
+    PRE_MANIFEST_SRC="$TOML_WD/pyproject.toml"
+else
+    PRE_MANIFEST_SRC=""
+fi
+
+# --- Lecture des configurations TOML ---
+if [ -n "$PRE_MANIFEST_SRC" ]; then
+    while IFS="|" read -r key val; do
+        if [ -z "$key" ]; then continue; fi
+        clean_val=$(echo "$val" | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+        
+        case "$key" in
+            output) OUTPUT="$clean_val" ;;
+            path) PROJECT_PATH="$clean_val" ;;
+            seamless) 
+                if [[ "${clean_val,,}" == "true" ]]; then SEAMLESS=true; else SEAMLESS=false; fi ;;
+            base-image) BASE_IMAGE="$clean_val" ;;
+            no-install) 
+                if [[ "${clean_val,,}" == "true" ]]; then NO_INSTALL=true; else NO_INSTALL=false; fi ;;
+            pixi-version) TARGET_PIXI_VERSION="$clean_val" ;;
+            latest) 
+                if [[ "${clean_val,,}" == "true" ]]; then LATEST_PIXI=true; else LATEST_PIXI=false; fi ;;
+            keep-def) 
+                if [[ "${clean_val,,}" == "true" ]]; then KEEP_DEF=true; else KEEP_DEF=false; fi ;;
+            quiet) 
+                if [[ "${clean_val,,}" == "true" ]]; then QUIET=true; else QUIET=false; fi ;;
+            verbose) 
+                if [[ "${clean_val,,}" == "true" ]]; then VERBOSE=true; else VERBOSE=false; fi ;;
+            env|add-file|post-command|label)
+                elements=$(echo "$val" | grep -o '"[^"]*"')
+                while read -r elem; do
+                    if [ -n "$elem" ]; then
+                        elem_clean="${elem//\"/}"
+                        case "$key" in
+                            env) ENVS+=("$elem_clean") ;;
+                            add-file) EXTRA_FILES+=("$elem_clean") ;;
+                            post-command) POST_COMMANDS+=("$elem_clean") ;;
+                            label) LABELS+=("$elem_clean") ;;
+                        esac
+                    fi
+                done <<< "$elements"
+                ;;
+        esac
+    done < <(awk '
+    /^\[tool\.pixitainer\]/ { flag=1; next }
+    /^\[/ { flag=0 }
+    flag {
+        sub(/#.*/, "")
+        gsub(/^[ \t]+|[ \t]+$/, "")
+        if (!length) next
+        
+        idx = index($0, "=")
+        if (!idx) {
+            match($0, /[ \t]+/)
+            if (RSTART) {
+                key = substr($0, 1, RSTART-1)
+                val = substr($0, RSTART+RLENGTH)
+            } else {
+                next
+            }
+        } else {
+            key = substr($0, 1, idx-1)
+            val = substr($0, idx+1)
+        }
+        
+        gsub(/^[ \t]+|[ \t]+$/, "", key)
+        gsub(/^[ \t]+|[ \t]+$/, "", val)
+        sub(/\r$/, "", key)
+        sub(/\r$/, "", val)
+        
+        print key "|" val
+    }' "$PRE_MANIFEST_SRC")
+fi
+
+# --- Parsing des arguments ---
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        # Core Options
+        -o|--output)
+            OUTPUT="$2"
+            shift 2
+            ;;
+        -p|--path)
+            PROJECT_PATH="$2"
+            shift 2
+            ;;
+        -s|--seamless)
+            SEAMLESS=true
+            shift
+            ;;
+
+        # Environment & Image Setup
+        -b|--base-image)
+            BASE_IMAGE="$2"
+            shift 2
+            ;;
+        -e|--env)
+            ENVS+=("$2")
+            shift 2
+            ;;
+        -n|--no-install)
+            NO_INSTALL=true
+            shift
+            ;;
+
+        # Pixi Versioning
+        -V|--pixi-version)
+            TARGET_PIXI_VERSION="$2"
+            shift 2
+            ;;
+        -L|--latest)
+            LATEST_PIXI=true
+            shift
+            ;;
+
+        # Advanced Modifications
+        -a|--add-file)
+            EXTRA_FILES+=("$2")
+            shift 2
+            ;;
+        -c|--post-command)
+            POST_COMMANDS+=("$2")
+            shift 2
+            ;;
+        -l|--label)
+            LABELS+=("$2")
+            shift 2
+            ;;
+        -k|--keep-def)
+            KEEP_DEF=true
+            shift
+            ;;
+
+        # General Options
+        -q|--quiet)
+            QUIET=true
+            shift
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+# --- Vérification de compatibilité des arguments ---
+if [ "$LATEST_PIXI" = true ] && [ -n "$TARGET_PIXI_VERSION" ]; then
+    echo "Error: The --latest flag cannot be used at the same time as --pixi-version."
+    exit 1
+fi
+
+if [ -n "$TARGET_PIXI_VERSION" ]; then
+    if ! printf '%s\n%s\n' "0.44.0" "$TARGET_PIXI_VERSION" | sort -V -c 2>/dev/null; then
+        echo "Error: Specified Pixi version must be 0.44.0 or newer."
+        exit 1
+    fi
+fi
+
+# --- Résolution des chemins ---
+WD=$(cd "$PROJECT_PATH" && pwd -P)
+# Pour l'output, on gère le cas où le fichier n'existe pas encore
+OUTPUT_DIR=$(dirname "$OUTPUT")
+# Si output est relatif, on le rend absolu par rapport au dossier courant
+if [[ "$OUTPUT_DIR" == "." ]]; then
+    OUTPUT_ABS="$(pwd -P)/$OUTPUT"
+    OUTPUT_PARENT="$(pwd -P)"
+else
+    mkdir -p "$OUTPUT_DIR"
+    OUTPUT_ABS="$(cd "$OUTPUT_DIR" && pwd -P)/$(basename "$OUTPUT")"
+    OUTPUT_PARENT="$(cd "$OUTPUT_DIR" && pwd -P)"
+fi
+
+TMP_DIR="$OUTPUT_PARENT/.tmp_pixitainer"
+if [ -f "$WD/pixi.toml" ]; then
+    MANIFEST_SRC="$WD/pixi.toml"
+    MANIFEST_DEST="/opt/conf/pixi.toml"
+elif [ -f "$WD/pyproject.toml" ]; then
+    MANIFEST_SRC="$WD/pyproject.toml"
+    MANIFEST_DEST="/opt/conf/pyproject.toml"
+else
+    if [ "$QUIET" = false ]; then
+        echo "Error: Neither pixi.toml nor pyproject.toml found in $WD"
+    fi
+    exit 1
+fi
+
+PIXI_LOCK="$WD/pixi.lock"
+
+log "📦 Containerizing project from: $WD"
+log "📂 Output target: $OUTPUT_ABS"
+
+# --- Préparation du .def ---
+mkdir -p "$TMP_DIR"
+# Derive .def name from output name (e.g. myimage.sif -> myimage.def)
+DEF_NAME="$(basename "${OUTPUT%.*}").def"
+TARGET_DEF="$TMP_DIR/$DEF_NAME"
+
+# Construction de la section %files
+FILES_SECTION="    \"$MANIFEST_SRC\" $MANIFEST_DEST"
+if [ -f "$PIXI_LOCK" ]; then
+    FILES_SECTION="$FILES_SECTION"$'\n'"    \"$PIXI_LOCK\" /opt/conf/pixi.lock"
+fi
+
+# Rajoute des fichiers supplémentaires
+for file_spec in "${EXTRA_FILES[@]}"; do
+    # Split "source:destination"
+    if [[ "$file_spec" == *":"* ]]; then
+        src="${file_spec%%:*}"
+        dest="${file_spec#*:}"
+        log "ℹ️  Adding file: $src -> $dest"
+        FILES_SECTION="$FILES_SECTION"$'\n'"    \"$src\" \"$dest\""
+    else
+        # If no destination is provided, Singularity copies it to the root or preserves name
+        log "ℹ️  Adding file: $file_spec"
+        FILES_SECTION="$FILES_SECTION"$'\n'"    \"$file_spec\""
+    fi
+done
+
+# Construction de la commande d'installation
+if [ "$NO_INSTALL" = true ]; then
+    INSTALL_CMD="pixi run echo 'Skipping environment installation'"
+elif [ ${#ENVS[@]} -gt 0 ]; then
+    ENV_FLAGS=""
+    for env in "${ENVS[@]}"; do
+        ENV_FLAGS="$ENV_FLAGS -e $env"
+    done
+    INSTALL_CMD="pixi install $ENV_FLAGS --frozen"
+else
+    INSTALL_CMD="pixi install -a --frozen"
+fi
+
+# Logique Seamless
+if [ "$SEAMLESS" = true ]; then
+    log "ℹ️  Seamless mode enabled"
+    RUNSCRIPT_CONTENT="pixi run --locked --as-is -m $MANIFEST_DEST \"\$@\""
+else
+    RUNSCRIPT_CONTENT='exec "$@"'
+fi
+
+# Gestion de la version de Pixi
+PIXI_VERSION_ENV=""
+PIXI_VERSION=$(pixi -V | grep -o " .*$")
+
+if [ -n "$TARGET_PIXI_VERSION" ]; then
+    PIXI_VERSION_ENV="pixi self-update --version $TARGET_PIXI_VERSION"
+    PIXI_VERSION="$TARGET_PIXI_VERSION"
+elif [ "$LATEST_PIXI" = true ]; then
+    PIXI_VERSION_ENV=""
+    PIXI_VERSION=$(curl -s https://api.github.com/repos/prefix-dev/pixi/releases/latest | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/')
+else
+    PIXI_VERSION_ENV="pixi self-update --version $PIXI_VERSION"
+fi
+
+# Formatage des labels personnalisés pour Singularity
+CUSTOM_LABELS_SECTION=""
+for label in "${LABELS[@]}"; do
+    formatted_label="${label/:/ }"
+    CUSTOM_LABELS_SECTION="$CUSTOM_LABELS_SECTION"$'\n'"    $formatted_label"
+done
+
+# Écriture du fichier de définition (Here-Doc)
+# Note: We inject "STEP:" echoes to track progress in non-verbose mode
+cat <<EOF > "$TARGET_DEF"
+Bootstrap: docker
+From: $BASE_IMAGE
+
+%labels
+    Created_With Pixitainer (https://github.com/RaphaelRibes/pixitainer)
+    Pixitainer_Version $PIXITAINER_VERSION
+    Pixi_Version $PIXI_VERSION$CUSTOM_LABELS_SECTION
+
+%files
+$FILES_SECTION
+
+%environment
+    export PIXI_HOME=/opt/pixi
+    export PIXI_PROJECT_MANIFEST=$MANIFEST_DEST
+    export PATH="/opt/pixi/bin:\$PATH"
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+
+    # 1. Install system dependencies
+    echo "STEP: Updating the image"
+    apt-get update && apt-get install -y curl
+
+    # 2. Install Pixi globally to /opt/pixi
+    export PIXI_HOME=/opt/pixi
+    echo "STEP: Downloading Pixi"
+    curl -fsSL https://pixi.sh/install.sh | bash
+    export PATH="/opt/pixi/bin:\$PATH"
+
+    $PIXI_VERSION_ENV
+
+    # 3. Setup the Project Environment
+    mkdir -p /opt/conf
+    cd /opt/conf
+
+    echo "STEP: Installing the environment"
+    pixi config set --local run-post-link-scripts insecure
+    $INSTALL_CMD
+
+    # 3.5 Run extra post commands
+    $(if [ ${#POST_COMMANDS[@]} -gt 0 ]; then
+        echo "echo \"STEP: Running extra post commands\""
+        printf '%s\n' "${POST_COMMANDS[@]}"
+    fi)
+
+    # 4. Cleanup
+    echo "STEP: Cleaning"
+    apt-get remove -y curl
+    apt-get autoremove -y
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+%runscript
+    cd /opt/conf
+    $RUNSCRIPT_CONTENT
+EOF
+
+# --- Build Singularity ---
+log "🚀 Starting Singularity build..."
+
+CMD=(singularity build --force --fakeroot "$OUTPUT_ABS" "$TARGET_DEF")
+
+if [ "$QUIET" = true ]; then
+    # Quiet Mode: Run completely silently.
+    if ! "${CMD[@]}" > /dev/null 2>&1; then
+        exit 1
+    fi
+elif [ "$VERBOSE" = true ]; then
+    # Verbose Mode: Run directly
+    "${CMD[@]}"
+else
+    # Temp files
+    LOG_FILE="$(mktemp)"
+    STEP_FILE="$(mktemp)" # To track current step across subshells
+
+    # Init step
+    CURRENT_STEP="Presetup (downloading image, importing files)"
+    echo "$CURRENT_STEP" > "$STEP_FILE"
+
+    # Spinner chars
+    SPIN='-\|/'
+    i=0
+
+    # Hide Cursor
+    tput civis 2>/dev/null || true
+
+    # Trap to restore cursor and clean log on exit
+    trap 'tput cnorm 2>/dev/null || true; rm -f "$LOG_FILE" "$STEP_FILE"' EXIT
+
+    set -o pipefail
+    set +e
+
+    # Run build, pipe output to loop
+    "${CMD[@]}" 2>&1 | while IFS= read -r line; do
+        # Save output to log file
+        echo "$line" >> "$LOG_FILE"
+
+        # Check for our injected STEP markers
+        if [[ "$line" == "STEP: "* ]]; then
+            # Mark previous step as done (overwrite spinner line with checkmark)
+            printf "\r [✅] %s\033[K\n" "$CURRENT_STEP"
+
+            # Update to new step
+            CURRENT_STEP="${line#STEP: }"
+            echo "$CURRENT_STEP" > "$STEP_FILE"
+
+            # Reset spinner
+            i=0
+        fi
+
+        # Update Spinner for CURRENT step
+        printf "\r [${SPIN:i++%4:1}] %s\033[K" "$CURRENT_STEP"
+    done
+
+    EC=$?
+
+    # Retrieve the very last step state from the temp file
+    LAST_STEP=$(cat "$STEP_FILE")
+
+    if [ $EC -eq 0 ]; then
+        # Mark the final step as done
+        printf "\r [✅] %s\033[K\n" "$LAST_STEP"
+    else
+        # Mark the final step as failed
+        printf "\r [❌] %s\033[K\n" "$LAST_STEP"
+        echo ""
+        echo "❌ Final build failed."
+        echo ""
+        echo "--- LOGS ---"
+        cat "$LOG_FILE"
+        exit $EC
+    fi
+fi
+
+log "✅ Success! Image built at: $OUTPUT_ABS"
+
+# Cleanup
+if [ "$KEEP_DEF" = true ]; then
+    FINAL_DEF="$OUTPUT_PARENT/$(basename "${OUTPUT%.*}").def"
+    mv "$TARGET_DEF" "$FINAL_DEF"
+    log "ℹ️  Definition file kept at: $FINAL_DEF"
+fi
+
+if [ -d "$TMP_DIR" ]; then
+    rm -rf "$TMP_DIR"
+fi
