@@ -97,7 +97,7 @@ We add `--as-is` to make sure it sticks to the `pixi.lock` file, and it only use
 
 ### Seamlessly
 
-Just use the pixitainer extension command after installing it with the seamless option (`-s`, `--seamless`).
+Use the pixitainer extension command after installing it with the seamless option (`-s`, `--seamless`).
 
 ```bash
 pixi containerize -s
@@ -180,7 +180,7 @@ However, sometimes pixi may write something in its cache so don't hesitate to us
 ## How ?
 
 The best thing to do will be to add this way as a [pixi extension](https://pixi.sh/latest/integration/extensions/introduction/), so we just have to type `pixi containerize`, some option and tada !
-> Note that pixitainer will install pixi with the same version that you have on your machine, you can change it with options look just down below.
+> Note that pixitainer will install pixi with the same version that you have on your machine, you can change it with options look down below.
 
 TODO:
 
