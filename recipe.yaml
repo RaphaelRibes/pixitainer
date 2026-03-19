@@ -2,31 +2,54 @@ context:
   name: pixitainer
   version: 0.6.1
 
-package:
+recipe:
   name: ${{ name }}
   version: ${{ version }}
 
 source:
   path: .
 
-build:
-  number: 0
-  noarch: generic
-  script:
-    - mkdir -p $PREFIX/bin
-    - cp pixi-containerize $PREFIX/bin/pixi-containerize
-    - chmod +x $PREFIX/bin/pixi-containerize
+outputs:
+  - package:
+      name: ${{ name }}
+    build:
+      number: 0
+      noarch: generic
+      script:
+        - mkdir -p $PREFIX/bin
+        - cp pixi-containerize $PREFIX/bin/pixi-containerize
+        - chmod +x $PREFIX/bin/pixi-containerize
+    requirements:
+      run:
+        - __linux
+        - apptainer >=1.4.5
+        - bash
+    about:
+      summary: Pixi is cool, apptainer is cool, let's make them both work together !
+      license: BSD-3-Clause
+      license_file: LICENSE
+      homepage: https://github.com/raphaelribes/pixitainer
+      repository: https://github.com/raphaelribes/pixitainer
+      description: It takes too much time to build and rebuild your Apptainer containers but pixi is hard to integrate in your pipelines ? Pixitainer is here to help you containerize your pixi pipelines into Apptainer/Singularity containers easily. Type `pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer` to install it and `pixi containerize --help` to get started.
 
-requirements:
-  run:
-    - __linux
-    - apptainer >=1.4.5
-    - bash
-
-about:
-  summary: Pixi is cool, apptainer is cool, let's make them both work together !
-  license: BSD-3-Clause
-  license_file: LICENSE
-  homepage: https://github.com/raphaelribes/pixitainer
-  repository: https://github.com/raphaelribes/pixitainer
-  description: It takes too much time to build and rebuild your Apptainer/Singularity containers but pixi is hard to integrate in your pipelines ? Pixitainer is here to help you containerize your pixi pipelines into Apptainer/Singularity containers easily. Type `pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer` to install it and `pixi containerize --help` to get started.
+  - package:
+      name: ${{ name }}-singularity
+    build:
+      number: 0
+      noarch: generic
+      script:
+        - mkdir -p $PREFIX/bin
+        - cp pixi-containerize-singularity $PREFIX/bin/pixi-containerize-singularity
+        - chmod +x $PREFIX/bin/pixi-containerize-singularity
+    requirements:
+      run:
+        - __linux
+        - singularity >=3.0.0
+        - bash
+    about:
+      summary: Pixi is cool, singularity is cool, let's make them both work together !
+      license: BSD-3-Clause
+      license_file: LICENSE
+      homepage: https://github.com/raphaelribes/pixitainer
+      repository: https://github.com/raphaelribes/pixitainer
+      description: It takes too much time to build and rebuild your Singularity containers but pixi is hard to integrate in your pipelines ? Pixitainer is here to help you containerize your pixi pipelines into Singularity containers easily. Type `pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer-singularity` to install it and `pixi containerize-singularity --help` to get started.

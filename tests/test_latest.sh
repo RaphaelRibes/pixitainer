@@ -14,7 +14,7 @@ if [ ! -f "pixitainer_latest.sif" ]; then
     exit 1
 fi
 
-LATEST_CONTAINER_PYTHON=$(pixi run -m ../../../pixi.toml apptainer run pixitainer_latest.sif pixi run --as-is python --version)
+LATEST_CONTAINER_PYTHON=$($CONTAINER_CMD run pixitainer_latest.sif pixi run --as-is python --version)
 
 if [[ ! "$LATEST_CONTAINER_PYTHON" =~ "Python 3." ]]; then
     echo "Error: Container does not have expected Python version. Got: $LATEST_CONTAINER_PYTHON"

@@ -48,7 +48,7 @@ fi
 
 echo "Verifying verbose output..."
 # Verify verbose output
-if ! grep -q "Starting Apptainer build..." output.log; then
+if ! grep -qE "Starting (Apptainer|Singularity) build\.\.\." output.log; then
     echo "Error: verbose output missing."
     cat output.log
     exit 1

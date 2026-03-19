@@ -30,7 +30,7 @@ if [ ! -f "$IMAGE_NAME" ]; then
 fi
 
 echo "Verifying seamless image..."
-CONTAINER_PYTHON=$(pixi run -m ../../../pixi.toml apptainer run "$IMAGE_NAME" python --version)
+CONTAINER_PYTHON=$($CONTAINER_CMD run "$IMAGE_NAME" python --version)
 
 if [[ ! "$CONTAINER_PYTHON" =~ "Python 3." ]]; then
     echo "Error: Container does not have expected Python version. Got: $CONTAINER_PYTHON"

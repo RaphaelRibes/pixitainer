@@ -39,19 +39,18 @@ if [ ! -f "toml_test.sif" ]; then
     exit 1
 fi
 
-echo "Verifying Apptainer image..."
-APPTAINER_CMD="pixi run -m ../../../pixi.toml apptainer"
+echo "Verifying container image..."
 
 echo " -> Verifying Python is installed..."
-$APPTAINER_CMD run toml_test.sif pixi run --as-is python --version | grep "Python 3."
+$CONTAINER_CMD run toml_test.sif pixi run --as-is python --version | grep "Python 3."
 
 echo " -> Verifying add-file..."
-$APPTAINER_CMD run toml_test.sif cat /opt/test_file.txt | grep "Validating add-file works"
+$CONTAINER_CMD run toml_test.sif cat /opt/test_file.txt | grep "Validating add-file works"
 
 echo " -> Verifying post-command..."
-$APPTAINER_CMD run toml_test.sif cat /opt/post_cmd.txt | grep "Hello from post-command"
+$CONTAINER_CMD run toml_test.sif cat /opt/post_cmd.txt | grep "Hello from post-command"
 
 echo " -> Verifying custom labels..."
-$APPTAINER_CMD inspect toml_test.sif | grep -i "APP_VERSION" | grep "1.2.3"
+$CONTAINER_CMD inspect toml_test.sif | grep -i "APP_VERSION" | grep "1.2.3"
 
 echo "All TOML configuration bounds verified successfully."
