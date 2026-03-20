@@ -1,6 +1,6 @@
 # Pixitainer
 
-![Version](https://img.shields.io/badge/Version-0.6.1-blue)
+![Version](https://img.shields.io/badge/Version-0.6.2-blue)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![License](https://img.shields.io/badge/Licence-BSD--3--Clause-green)](LICENSE)
 [![Forge](https://img.shields.io/badge/Forge-Prefix.dev--Forge-yellow)](https://prefix.dev/channels/raphaelribes/packages/pixitainer)
@@ -156,6 +156,7 @@ add-file = ["data/config.yaml:/opt/config.yaml"]
 post-command = ["echo 'Setup done' > /opt/setup.log"]
 label = ["APP_VERSION:1.0.0", "AUTHOR:me"]
 keep-def = false
+dry-run = false
 quiet = false
 verbose = false
 ```
@@ -227,6 +228,8 @@ TODO:
     - [x] Run extra post commands (`-c`, `--post-command`)
     - [x] Add extra labels (`-l`, `--label`)
     - [x] Export the `.def` file (`-k`, `--keep-def`)
+  - [x] Output Options
+    - [x] Dry-run (`-d`, `--dry-run`)
   - [x] General Options
     - [x] Quiet mode (`-q`, `--quiet`)
     - [x] Verbose mode (`-v`, `--verbose`)

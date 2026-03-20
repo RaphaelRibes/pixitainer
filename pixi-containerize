@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-PIXITAINER_VERSION="0.6.1"
+PIXITAINER_VERSION="0.6.2"
 
 # Wrapper to echo only if not quiet
 log() {
@@ -32,6 +32,7 @@ LATEST_PIXI=false
 KEEP_DEF=false
 VERBOSE=false
 QUIET=false
+DRY_RUN=false
 NO_INSTALL=false
 declare -a ENVS
 declare -a EXTRA_FILES
@@ -68,6 +69,10 @@ usage() {
     echo "  -c, --post-command CMD    Add a command to run in %post section (can be used multiple times)"
     echo "  -l, --label KEY:VALUE     Add a custom label to the image (can be used multiple times)"
     echo "  -k, --keep-def            Export the .def file (do not delete temporary files)"
+    echo ""
+
+    echo "Output Options:"
+    echo "  -d, --dry-run             Output the .def file to stdout without building the image"
     echo ""
 
     echo "General Options:"
@@ -113,6 +118,8 @@ if [ -n "$PRE_MANIFEST_SRC" ]; then
                 if [[ "${clean_val,,}" == "true" ]]; then LATEST_PIXI=true; else LATEST_PIXI=false; fi ;;
             keep-def) 
                 if [[ "${clean_val,,}" == "true" ]]; then KEEP_DEF=true; else KEEP_DEF=false; fi ;;
+            dry-run) 
+                if [[ "${clean_val,,}" == "true" ]]; then DRY_RUN=true; else DRY_RUN=false; fi ;;
             quiet) 
                 if [[ "${clean_val,,}" == "true" ]]; then QUIET=true; else QUIET=false; fi ;;
             verbose) 
@@ -221,6 +228,10 @@ while [[ $# -gt 0 ]]; do
             KEEP_DEF=true
             shift
             ;;
+        -d|--dry-run)
+            DRY_RUN=true
+            shift
+            ;;
 
         # General Options
         -q|--quiet)
@@ -302,26 +313,44 @@ if [ -f "$PIXI_LOCK" ]; then
 fi
 
 # Rajoute des fichiers supplémentaires
-for file_spec in "${EXTRA_FILES[@]}"; do
-    # Split "source:destination"
+if [ ${#EXTRA_FILES[@]} -eq 1 ]; then
+    file_spec="${EXTRA_FILES[0]}"
     if [[ "$file_spec" == *":"* ]]; then
         src="${file_spec%%:*}"
         dest="${file_spec#*:}"
         log "ℹ️  Adding file: $src -> $dest"
         FILES_SECTION="$FILES_SECTION"$'\n'"    \"$src\" \"$dest\""
     else
-        # If no destination is provided, Apptainer copies it to the root or preserves name
         log "ℹ️  Adding file: $file_spec"
         FILES_SECTION="$FILES_SECTION"$'\n'"    \"$file_spec\""
     fi
-done
+elif [ ${#EXTRA_FILES[@]} -gt 1 ]; then
+    log "ℹ️  Adding files:"
+    for file_spec in "${EXTRA_FILES[@]}"; do
+        if [[ "$file_spec" == *":"* ]]; then
+            src="${file_spec%%:*}"
+            dest="${file_spec#*:}"
+            log "      - $src -> $dest"
+            FILES_SECTION="$FILES_SECTION"$'\n'"    \"$src\" \"$dest\""
+        else
+            log "      - $file_spec"
+            FILES_SECTION="$FILES_SECTION"$'\n'"    \"$file_spec\""
+        fi
+    done
+fi
 
 # Construction de la commande d'installation
 if [ "$NO_INSTALL" = true ]; then
     INSTALL_CMD="pixi run echo 'Skipping environment installation'"
-elif [ ${#ENVS[@]} -gt 0 ]; then
+elif [ ${#ENVS[@]} -eq 1 ]; then
+    env="${ENVS[0]}"
+    log "ℹ️  Adding environment: $env"
+    INSTALL_CMD="pixi install -e $env --frozen"
+elif [ ${#ENVS[@]} -gt 1 ]; then
+    log "ℹ️  Adding environments:"
     ENV_FLAGS=""
     for env in "${ENVS[@]}"; do
+        log "      - $env"
         ENV_FLAGS="$ENV_FLAGS -e $env"
     done
     INSTALL_CMD="pixi install $ENV_FLAGS --frozen"
@@ -353,10 +382,30 @@ fi
 
 # Formatage des labels personnalisés pour Apptainer
 CUSTOM_LABELS_SECTION=""
-for label in "${LABELS[@]}"; do
+if [ ${#LABELS[@]} -eq 1 ]; then
+    label="${LABELS[0]}"
+    log "ℹ️  Adding label: $label"
     formatted_label="${label/:/ }"
     CUSTOM_LABELS_SECTION="$CUSTOM_LABELS_SECTION"$'\n'"    $formatted_label"
-done
+elif [ ${#LABELS[@]} -gt 1 ]; then
+    log "ℹ️  Adding labels:"
+    for label in "${LABELS[@]}"; do
+        log "      - $label"
+        formatted_label="${label/:/ }"
+        CUSTOM_LABELS_SECTION="$CUSTOM_LABELS_SECTION"$'\n'"    $formatted_label"
+    done
+fi
+
+# Log des commandes post-build
+if [ ${#POST_COMMANDS[@]} -eq 1 ]; then
+    cmd="${POST_COMMANDS[0]}"
+    log "ℹ️  Adding post-command: $cmd"
+elif [ ${#POST_COMMANDS[@]} -gt 1 ]; then
+    log "ℹ️  Adding post-commands:"
+    for cmd in "${POST_COMMANDS[@]}"; do
+        log "      - $cmd"
+    done
+fi
 
 # Écriture du fichier de définition (Here-Doc)
 # Note: We inject "STEP:" echoes to track progress in non-verbose mode
@@ -403,7 +452,7 @@ $FILES_SECTION
     # 3.5 Run extra post commands
     $(if [ ${#POST_COMMANDS[@]} -gt 0 ]; then
         echo "echo \"STEP: Running extra post commands\""
-        printf '%s\n' "${POST_COMMANDS[@]}"
+        printf '    %s\n' "${POST_COMMANDS[@]}"
     fi)
 
     # 4. Cleanup
@@ -417,6 +466,13 @@ $FILES_SECTION
     cd /opt/conf
     $RUNSCRIPT_CONTENT
 EOF
+
+# --- Dry-run mode: output .def and exit ---
+if [ "$DRY_RUN" = true ]; then
+    cat "$TARGET_DEF"
+    rm -rf "$TMP_DIR"
+    exit 0
+fi
 
 # --- Build Apptainer ---
 log "🚀 Starting Apptainer build..."

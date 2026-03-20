@@ -162,6 +162,7 @@ TESTS_TO_RUN=(
     "test_base_image.sh"
     "test_pixi_version.sh"
     "test_keep_def.sh"
+    "test_dry_run.sh"
     "test_post_cmd.sh"
     "test_add_file.sh"
     "test_pyproject.sh"

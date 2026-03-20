@@ -1,3 +1,12 @@
+# Changelog
+
+## [0.6.2] - 2026-03-20
+
+### 🚀 Features
+
+- Added `-d/--dry-run` flag to output the container definition file without building it
+- Improved verbose output for additional files, labels, and post-commands
+
 ## [0.6.1] - 2026-03-12
 
 ### 🚀 Features
