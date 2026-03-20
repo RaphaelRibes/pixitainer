@@ -28,12 +28,12 @@ if [[ "$TOOL" == "singularity" ]]; then
     CONTAINER_CMD="singularity"
 else
     TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize"
-    CONTAINER_CMD="pixi run -m $(cd "$(dirname "$0")/.." && pwd -P)/pixi.toml apptainer"
+    CONTAINER_CMD="apptainer"
 fi
 
 # Base directory for individual test workspaces
-BASE_WORK_DIR="${TESTS_DIR}/test_workspaces"
-SHARED_REPO_DIR="${TESTS_DIR}/TestRepo"
+BASE_WORK_DIR="${TESTS_DIR}/test_workspaces_${TOOL}"
+SHARED_REPO_DIR="${TESTS_DIR}/TestRepo_${TOOL}"
 
 # Export for sub-scripts
 export TOOL_SCRIPT

@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tool: [apptainer, singularity]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Pixi
+        uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          manifest-path: tests/pixi.toml
+
+      - name: Run Tests
+        working-directory: tests
+        run: |
+          pixi run bash run_all.sh --tool ${{ matrix.tool }} -b 1

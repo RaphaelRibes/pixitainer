@@ -1,0 +1,8 @@
+[project]
+name = "pixitainer-tests"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+apptainer = "*"
+singularity = "*"
