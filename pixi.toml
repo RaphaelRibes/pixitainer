@@ -11,6 +11,12 @@ description = "Publish the built pixitainer package to the raphaelribes channel.
 cmd = "pixi upload prefix --channel raphaelribes ./pixitainer-singularity*.conda"
 description = "Publish the built pixitainer-singularity package to the raphaelribes channel."
 
+[tasks.install]
+cmd = "pixi global install --path pixitainer-0*.conda -c https://prefix.dev/conda-forge pixitainer --force-reinstall"
+
+[tasks.install_singularity]
+cmd = "pixi global install --path pixitainer-singularity*.conda -c https://prefix.dev/conda-forge pixitainer-singularity --force-reinstall"
+
 [package.build.backend]
 name = "pixi-build-rattler-build"
 version = ">=0.3.7"
