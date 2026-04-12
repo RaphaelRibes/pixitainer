@@ -17,10 +17,23 @@ SEAMLESS=false
 if [ -f /etc/os-release ]; then
     source /etc/os-release
 
-    if [ -z "$VERSION_ID" ]; then
-        BASE_IMAGE="${ID}:latest"
+    if [[ "$ID" == "ubuntu" || "$ID" == "debian" || "$ID" == "fedora" || "$ID" == "alpine" || "$ID" == "rockylinux" || "$ID" == "almalinux" ]]; then
+        if [ -z "$VERSION_ID" ]; then
+            BASE_IMAGE="${ID}:latest"
+        else
+            BASE_IMAGE="${ID}:${VERSION_ID}"
+        fi
+    elif [[ "$ID" == "arch" || "$ID" == "archlinux" || "$ID_LIKE" == *"arch"* ]]; then
+        BASE_IMAGE="archlinux:latest"
+    elif [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
+        BASE_IMAGE="ubuntu:24.04"
+    elif [[ "$ID_LIKE" == *"fedora"* || "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
+        BASE_IMAGE="fedora:latest"
+    elif [[ "$ID_LIKE" == *"suse"* ]]; then
+        BASE_IMAGE="opensuse/tumbleweed:latest"
     else
-        BASE_IMAGE="${ID}:${VERSION_ID}"
+        echo "⚠️  Warning: Unsupported OS '$ID'. Defaulting to ubuntu:24.04 as base image."
+        BASE_IMAGE="ubuntu:24.04"
     fi
 else
     echo "⚠️  Warning: /etc/os-release not found. Defaulting to ubuntu:24.04 as base image."
@@ -487,7 +500,35 @@ $FILES_SECTION
 
     # 1. Install system dependencies
     echo "STEP: Updating the image"
-    apt-get update && apt-get install -y curl
+    MISSING_PKGS=""
+    if ! command -v curl >/dev/null 2>&1; then MISSING_PKGS="curl ca-certificates"; fi
+    if ! command -v bash >/dev/null 2>&1; then MISSING_PKGS="\$MISSING_PKGS bash"; fi
+    
+    if [ -n "\$MISSING_PKGS" ]; then
+        if command -v apt-get >/dev/null 2>&1; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update && apt-get install -y --no-install-recommends \$MISSING_PKGS
+            PKGMGR="apt"
+        elif command -v pacman >/dev/null 2>&1; then
+            pacman -Sy --noconfirm \$MISSING_PKGS
+            PKGMGR="pacman"
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y \$MISSING_PKGS
+            PKGMGR="dnf"
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y \$MISSING_PKGS
+            PKGMGR="yum"
+        elif command -v apk >/dev/null 2>&1; then
+            apk add --no-cache \$MISSING_PKGS
+            PKGMGR="apk"
+        elif command -v zypper >/dev/null 2>&1; then
+            zypper in -y \$MISSING_PKGS
+            PKGMGR="zypper"
+        else
+            echo "Error: No known package manager found"
+            exit 1
+        fi
+    fi
 
     # 2. Install Pixi globally to /opt/pixi
     export PIXI_HOME=/opt/pixi
@@ -513,10 +554,31 @@ $FILES_SECTION
 
     # 4. Cleanup
     echo "STEP: Cleaning"
-    apt-get remove -y curl
-    apt-get autoremove -y
-    apt-get clean
-    rm -rf /var/lib/apt/lists/*
+    if [ -n "\$PKGMGR" ]; then
+        if echo "\$MISSING_PKGS" | grep -q "curl"; then
+            if [ "\$PKGMGR" = "apt" ]; then
+                apt-get remove -y curl && apt-get autoremove -y
+            elif [ "\$PKGMGR" = "pacman" ]; then
+                pacman -Rns --noconfirm curl || true
+            elif [ "\$PKGMGR" = "dnf" ] || [ "\$PKGMGR" = "yum" ]; then
+                \$PKGMGR remove -y curl
+            elif [ "\$PKGMGR" = "apk" ]; then
+                apk del curl
+            elif [ "\$PKGMGR" = "zypper" ]; then
+                zypper rm -y curl
+            fi
+        fi
+        
+        if [ "\$PKGMGR" = "apt" ]; then
+            apt-get clean && rm -rf /var/lib/apt/lists/*
+        elif [ "\$PKGMGR" = "pacman" ]; then
+            pacman -Scc --noconfirm || true
+        elif [ "\$PKGMGR" = "dnf" ] || [ "\$PKGMGR" = "yum" ]; then
+            \$PKGMGR clean all
+        elif [ "\$PKGMGR" = "zypper" ]; then
+            zypper clean
+        fi
+    fi
 
 %runscript
     cd /opt/conf
