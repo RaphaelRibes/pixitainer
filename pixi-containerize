@@ -99,75 +99,131 @@ else
     PRE_MANIFEST_SRC=""
 fi
 
-# --- Lecture des configurations TOML ---
-if [ -n "$PRE_MANIFEST_SRC" ]; then
-    while IFS="|" read -r key val; do
-        if [ -z "$key" ]; then continue; fi
-        clean_val=$(echo "$val" | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
-        
-        case "$key" in
-            output) OUTPUT="$clean_val" ;;
-            path) PROJECT_PATH="$clean_val" ;;
-            seamless) 
-                if [[ "${clean_val,,}" == "true" ]]; then SEAMLESS=true; else SEAMLESS=false; fi ;;
-            base-image) BASE_IMAGE="$clean_val" ;;
-            no-install) 
-                if [[ "${clean_val,,}" == "true" ]]; then NO_INSTALL=true; else NO_INSTALL=false; fi ;;
-            pixi-version) TARGET_PIXI_VERSION="$clean_val" ;;
-            latest) 
-                if [[ "${clean_val,,}" == "true" ]]; then LATEST_PIXI=true; else LATEST_PIXI=false; fi ;;
-            keep-def) 
-                if [[ "${clean_val,,}" == "true" ]]; then KEEP_DEF=true; else KEEP_DEF=false; fi ;;
-            dry-run) 
-                if [[ "${clean_val,,}" == "true" ]]; then DRY_RUN=true; else DRY_RUN=false; fi ;;
-            quiet) 
-                if [[ "${clean_val,,}" == "true" ]]; then QUIET=true; else QUIET=false; fi ;;
-            verbose) 
-                if [[ "${clean_val,,}" == "true" ]]; then VERBOSE=true; else VERBOSE=false; fi ;;
-            env|add-file|post-command|label)
-                elements=$(echo "$val" | grep -o '"[^"]*"')
-                while read -r elem; do
-                    if [ -n "$elem" ]; then
-                        elem_clean="${elem//\"/}"
-                        case "$key" in
-                            env) ENVS+=("$elem_clean") ;;
-                            add-file) EXTRA_FILES+=("$elem_clean") ;;
-                            post-command) POST_COMMANDS+=("$elem_clean") ;;
-                            label) LABELS+=("$elem_clean") ;;
-                        esac
-                    fi
-                done <<< "$elements"
-                ;;
-        esac
-    done < <(awk '
-    /^\[tool\.pixitainer\]/ { flag=1; next }
+# --- TOML section parser (usage: _parse_toml_section SECTION FILE) ---
+# Prints "key|raw_value" lines for every key found in the given TOML table.
+_parse_toml_section() {
+    local section="$1"
+    local file="$2"
+    # Escape dots for awk regex with double backslashes to avoid awk -v warnings
+    local esc_section
+    esc_section=$(printf '%s' "$section" | sed 's/\./\\\\./g')
+    awk -v sec="$section" -v esc="$esc_section" '
+    $0 ~ ("^\\[" esc "\\]") { flag=1; next }
     /^\[/ { flag=0 }
     flag {
         sub(/#.*/, "")
+        gsub(/\r$/, "")
         gsub(/^[ \t]+|[ \t]+$/, "")
         if (!length) next
-        
-        idx = index($0, "=")
-        if (!idx) {
-            match($0, /[ \t]+/)
-            if (RSTART) {
-                key = substr($0, 1, RSTART-1)
-                val = substr($0, RSTART+RLENGTH)
-            } else {
-                next
+
+        if (in_array) {
+            accumulated = accumulated " " $0
+            if ($0 ~ /\]/) {
+                in_array = 0
+                print current_key "|" accumulated
+                accumulated = ""
+                current_key = ""
             }
-        } else {
-            key = substr($0, 1, idx-1)
-            val = substr($0, idx+1)
+            next
         }
-        
+
+        idx = index($0, "=")
+        if (!idx) next
+
+        key = substr($0, 1, idx-1)
+        val = substr($0, idx+1)
         gsub(/^[ \t]+|[ \t]+$/, "", key)
         gsub(/^[ \t]+|[ \t]+$/, "", val)
-        sub(/\r$/, "", key)
-        sub(/\r$/, "", val)
-        
+
+        if (val ~ /^\[/ && val !~ /\]/) {
+            in_array = 1
+            current_key = key
+            accumulated = val
+            next
+        }
+
         print key "|" val
-    }' "$PRE_MANIFEST_SRC")
+    }
+    END {
+        if (in_array && current_key != "") {
+            print current_key "|" accumulated
+        }
+    }
+    ' "$file"
+}
+
+# --- Apply a parsed key/val line to the Apptainer variable set ---
+# Pass "reset" as third arg to clear arrays on first encounter.
+_apply_toml_apptainer() {
+    local key="$1"
+    local val="$2"
+    local reset_mode="${3:-false}"   # "true" = subtable pass (reset arrays on first use)
+
+    local clean_val
+    clean_val=$(echo "$val" | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+
+    case "$key" in
+        output)     OUTPUT="$clean_val" ;;
+        path)       PROJECT_PATH="$clean_val" ;;
+        seamless)
+            if [[ "${clean_val,,}" == "true" ]]; then SEAMLESS=true; else SEAMLESS=false; fi ;;
+        base-image) BASE_IMAGE="$clean_val" ;;
+        no-install)
+            if [[ "${clean_val,,}" == "true" ]]; then NO_INSTALL=true; else NO_INSTALL=false; fi ;;
+        pixi-version) TARGET_PIXI_VERSION="$clean_val" ;;
+        latest)
+            if [[ "${clean_val,,}" == "true" ]]; then LATEST_PIXI=true; else LATEST_PIXI=false; fi ;;
+        keep-def)
+            if [[ "${clean_val,,}" == "true" ]]; then KEEP_DEF=true; else KEEP_DEF=false; fi ;;
+        dry-run)
+            if [[ "${clean_val,,}" == "true" ]]; then DRY_RUN=true; else DRY_RUN=false; fi ;;
+        quiet)
+            if [[ "${clean_val,,}" == "true" ]]; then QUIET=true; else QUIET=false; fi ;;
+        verbose)
+            if [[ "${clean_val,,}" == "true" ]]; then VERBOSE=true; else VERBOSE=false; fi ;;
+        env|add-file|post-command|label)
+            local elements
+            elements=$(echo "$val" | grep -o '"[^"]*"')
+            local first_elem=true
+            while read -r elem; do
+                if [ -n "$elem" ]; then
+                    local elem_clean="${elem//\"/}"
+                    # On subtable pass, reset the array on first element of each key
+                    if [ "$reset_mode" = "true" ] && [ "$first_elem" = "true" ]; then
+                        case "$key" in
+                            env)          ENVS=() ;;
+                            add-file)     EXTRA_FILES=() ;;
+                            post-command) POST_COMMANDS=() ;;
+                            label)        LABELS=() ;;
+                        esac
+                        first_elem=false
+                    fi
+                    case "$key" in
+                        env)          ENVS+=("$elem_clean") ;;
+                        add-file)     EXTRA_FILES+=("$elem_clean") ;;
+                        post-command) POST_COMMANDS+=("$elem_clean") ;;
+                        label)        LABELS+=("$elem_clean") ;;
+                    esac
+                fi
+            done <<< "$elements"
+            ;;
+    esac
+}
+
+# --- Lecture des configurations TOML ---
+# Priority: [tool.pixitainer] < [tool.pixitainer.apptainer] < CLI
+if [ -n "$PRE_MANIFEST_SRC" ]; then
+    # Pass 1 — general table
+    while IFS="|" read -r key val; do
+        [ -z "$key" ] && continue
+        _apply_toml_apptainer "$key" "$val" "false"
+    done < <(_parse_toml_section "tool.pixitainer" "$PRE_MANIFEST_SRC")
+
+    # Pass 2 — apptainer-specific table (overrides general)
+    while IFS="|" read -r key val; do
+        [ -z "$key" ] && continue
+        _apply_toml_apptainer "$key" "$val" "true"
+    done < <(_parse_toml_section "tool.pixitainer.apptainer" "$PRE_MANIFEST_SRC")
 fi
 
 # --- Parsing des arguments ---
@@ -545,6 +601,15 @@ else
         echo ""
         echo "❌ Final build failed."
         echo ""
+
+        if grep -qiE "conveyor failed to get|manifest unknown" "$LOG_FILE"; then
+            echo "💡 Hint: Apptainer failed to pull the base image '$BASE_IMAGE'."
+            echo "   It may not exist on Docker Hub or requires authentication."
+            echo "   Try specifying a valid base image using the '-b' flag."
+            echo "   For example: pixi containerize -b ubuntu:24.04"
+            echo ""
+        fi
+
         echo "--- LOGS ---"
         cat "$LOG_FILE"
         exit $EC

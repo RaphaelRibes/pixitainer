@@ -7,6 +7,10 @@ preview = ["pixi-build"]
 cmd = "pixi upload prefix --channel raphaelribes ./pixitainer-0*.conda"
 description = "Publish the built pixitainer package to the raphaelribes channel."
 
+[tasks.publish_docker]
+cmd = "pixi upload prefix --channel raphaelribes ./pixitainer-docker*.conda"
+description = "Publish the built pixitainer-docker package to the raphaelribes channel."
+
 [tasks.publish_singularity]
 cmd = "pixi upload prefix --channel raphaelribes ./pixitainer-singularity*.conda"
 description = "Publish the built pixitainer-singularity package to the raphaelribes channel."
@@ -16,6 +20,16 @@ cmd = "pixi global install --path pixitainer-0*.conda -c https://prefix.dev/cond
 
 [tasks.install_singularity]
 cmd = "pixi global install --path pixitainer-singularity*.conda -c https://prefix.dev/conda-forge pixitainer-singularity --force-reinstall"
+
+[tasks.install_docker]
+cmd = "pixi global install --path pixitainer-docker*.conda -c https://prefix.dev/conda-forge pixitainer-docker --force-reinstall"
+
+[tasks.install_all]
+depends-on = [
+    {task = "install"},
+    {task = "install_singularity"},
+    {task = "install_docker"},
+]
 
 [package.build.backend]
 name = "pixi-build-rattler-build"

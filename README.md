@@ -144,7 +144,17 @@ singularity run -f pixitainer.sif make_dir
 
 ## TOML Configuration
 
-Since **v0.6.0**, you can configure pixitainer options directly in your project manifest (`pixi.toml` or `pyproject.toml`) using the `[tool.pixitainer]` table. This avoids passing long command-line arguments every time you build.
+Since **v0.6.0**, you can configure pixitainer options directly in your project manifest (`pixi.toml` or `pyproject.toml`). Since **v0.7.0**, the configuration supports a three-tier priority system.
+
+### Priority order (lowest → highest)
+
+```
+[tool.pixitainer]  <  [tool.pixitainer.<backend>]  <  CLI arguments
+```
+
+### `[tool.pixitainer]` — shared defaults
+
+Keys placed here apply to **all backends** (Apptainer, Singularity, Docker) unless overridden.
 
 ```toml
 [tool.pixitainer]
@@ -159,13 +169,59 @@ keep-def = false
 dry-run = false
 quiet = false
 verbose = false
+pixi-version = "0.64.0"
 ```
 
-> **Note**: All keys mirror the long-form CLI option names (without the `--` prefix). Boolean options use `true`/`false`, and array options (`env`, `add-file`, `post-command`, `label`) use TOML array syntax.
+### `[tool.pixitainer.apptainer]` / `[tool.pixitainer.singularity]` / `[tool.pixitainer.docker]` — backend overrides
 
-### CLI overrides TOML
+Keys placed in a backend-specific table **override** the matching key from `[tool.pixitainer]` for that backend only. Scalar keys fully replace the general value. **Array keys (`env`, `add-file`, `post-command`, `label`, and the Docker-specific arrays) fully replace** the general array — they are not merged or appended.
 
-Command-line arguments **always take precedence** over values set in the `[tool.pixitainer]` table. This lets you define sensible defaults in your manifest while overriding them on a per-build basis:
+```toml
+[tool.pixitainer]
+output = "my_image.sif"
+base-image = "ubuntu:24.04"
+seamless = true
+label = ["AUTHOR:me"]
+
+# When running `pixi containerize` (Apptainer):
+# output → "my_apptainer.sif", label → ["AUTHOR:me", "APPTAINER:yes"]
+[tool.pixitainer.apptainer]
+output = "my_apptainer.sif"
+label = ["AUTHOR:me", "APPTAINER:yes"]
+
+# When running `pixi containerize-docker`:
+# output → "my_image" (tag), user → "nobody", label stays ["AUTHOR:me"] from general
+[tool.pixitainer.docker]
+output = "my_image"
+user = "nobody"
+```
+
+Docker-specific keys that are only valid under `[tool.pixitainer.docker]`:
+
+```toml
+[tool.pixitainer.docker]
+output = "my_image:latest"
+user = "nobody"
+workdir = "/workspace"
+no-cache = false
+push = false
+squash = false
+platform = "linux/amd64"
+network = "host"
+save = "my_image.tar.gz"
+build-arg = ["KEY=value"]
+secret = ["id=token,src=/path/to/token"]
+ssh = ["default"]
+tag = ["registry.example.com/my_image:latest"]
+cache-from = ["type=registry,ref=ghcr.io/me/img:cache"]
+cache-to = ["type=inline"]
+```
+
+> **Note**: All keys mirror the long-form CLI option names (without the `--` prefix). Boolean options use `true`/`false`, and array options use TOML array syntax.
+
+### CLI overrides everything
+
+Command-line arguments always win over both TOML tables. This lets you define sensible defaults in your manifest and override them on a per-build basis:
 
 ```bash
 # Uses TOML defaults, but overrides the output path
@@ -193,7 +249,7 @@ What you want is to run pixi in the `INIT_CWD` so take the time to change your `
 > If you have files to import in the container (ex: your build) you can put it in `/opt/conf` and it will allow normal execution.
 > However, be conscious that your outputs will also be in `/opt/conf` and not in your current working directory.
 > Since you cannot write in a container, you will have to specify the outputs with `$INIT_CWD` and bind the folder where you want your outputs to be.
->
+
 ### Read-only file system (os error 30)
 
 This is related to the previous problem: pixi is using `PIXI_PROJECT_ROOT` as the `cwd`.
@@ -233,12 +289,29 @@ TODO:
   - [x] General Options
     - [x] Quiet mode (`-q`, `--quiet`)
     - [x] Verbose mode (`-v`, `--verbose`)
+  - [x] Docker-specific Options
+    - [x] Build without cache (`--no-cache`)
+    - [x] Push image to registry (`--push`)
+    - [x] Multi-platform builds (`--platform`)
+    - [x] Squash all layers (`--squash`)
+    - [x] Build-time network mode (`--network`)
+    - [x] Build-time ARG variables (`--build-arg`)
+    - [x] BuildKit secret mounts (`--secret`)
+    - [x] SSH agent forwarding (`--ssh`)
+    - [x] Extra image tags (`-t`, `--tag`)
+    - [x] Cache reuse from registry (`--cache-from`)
+    - [x] Cache export after build (`--cache-to`)
+    - [x] Export image to archive (`--save`)
+    - [x] Run container as user (`--user`)
+    - [x] Override container working directory (`--workdir`)
+  - [ ] Support to containerize a specific tool, without need a pixi manifest
+    - [ ] e.g `pixi containerize tool -c/--channel <channel> -v/--version <tool_name>`]
 - [x] Support the options in a `[tool.pixitainer]` table in the manifest
-- [ ] Support of container solutions
+  - [x] Support backend-specific subtables (`[tool.pixitainer.<backend>]`)
+- [x] Support of container solutions
   - [x] Apptainer
   - [x] Singularity
-  - [ ] Docker
-    > Note that by default pixitainer is made with Apptainer in mind so it will be an option to install other container solutions.
+  - [x] Docker
 - [x] Testings.
 - [x] Publish
 - [ ] Go back to step 3 until WW3, messiah or death of the internet
