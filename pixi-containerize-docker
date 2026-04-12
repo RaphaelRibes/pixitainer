@@ -500,7 +500,7 @@ fi
 PIXI_LOCK="$WD/pixi.lock"
 
 # Build context lives next to the current working directory
-TMP_DIR="$(pwd -P)/ctx/.tmp_pixitainer_docker"
+TMP_DIR="$(pwd -P).tmp_pixitainer_docker"
 
 log "📦 Containerizing project from: $WD"
 log "🐳 Docker image tag: $OUTPUT"
@@ -508,6 +508,7 @@ log "🐳 Docker image tag: $OUTPUT"
 # --- Prepare build context ---
 # Docker COPY only works within the build context, so we stage all files
 # into a temporary directory that becomes the build context.
+mkdir -p "$TMP_DIR/ctx"
 
 # Copy manifest and lock file into context
 cp "$MANIFEST_SRC" "$TMP_DIR/ctx/$MANIFEST_BASENAME"
