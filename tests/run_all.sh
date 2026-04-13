@@ -25,10 +25,10 @@ TESTS_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 
 if [[ "$TOOL" == "singularity" ]]; then
     TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize-singularity"
-    CONTAINER_CMD="singularity"
+    CONTAINER_CMD="pixi run singularity"
 else
     TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize"
-    CONTAINER_CMD="pixi run -m $(cd "$(dirname "$0")/.." && pwd -P)/pixi.toml apptainer"
+    CONTAINER_CMD="pixi run apptainer"
 fi
 
 # Base directory for individual test workspaces

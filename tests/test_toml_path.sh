@@ -5,14 +5,13 @@ cd "$REPO_DIR"
 
 # Cleanup
 rm -rf .gitignore .pixi toml_path.sif pixi.toml subdir
-mkdir subdir
+pixi init subdir
 cd subdir
-pixi init .
 pixi add python
 cd ..
 
 echo "Initializing project in subdir..."
-
+pixi init
 cat << 'EOF' >> pixi.toml
 
 [tool.pixitainer]
