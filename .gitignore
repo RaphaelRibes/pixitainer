@@ -3,7 +3,8 @@
 !.pixi/config.toml
 .idea/
 *.sif
-tests/RaMiLass/
+tests/test_workspaces*/
+tests/TestRepo*/
 rattler-build-log.txt
 output/
 *.conda

@@ -45,7 +45,7 @@ detect_base_image() {
         echo "⚠️  Warning: /etc/os-release not found. Defaulting to ubuntu:24.04 as base image."
         BASE_IMAGE="ubuntu:24.04"
     fi
-    log "ℹ️  Base image: $BASE_IMAGE"
+    log "ℹ️ Base image: $BASE_IMAGE"
 }
 
 # ---------------------------------------------------------------------------
@@ -345,10 +345,10 @@ build_install_cmd() {
         INSTALL_CMD="echo 'Skipping environment installation'"
     elif [ ${#ENVS[@]} -eq 1 ]; then
         local env="${ENVS[0]}"
-        log "ℹ️  Adding environment: $env"
+        log "ℹ️ Adding environment: $env"
         INSTALL_CMD="pixi install -e $env --frozen"
     elif [ ${#ENVS[@]} -gt 1 ]; then
-        log "ℹ️  Adding environments:"
+        log "ℹ️ Adding environments:"
         local env_flags=""
         for env in "${ENVS[@]}"; do
             log "      - $env"
@@ -388,9 +388,9 @@ resolve_pixi_version() {
 # ---------------------------------------------------------------------------
 log_labels() {
     if [ ${#LABELS[@]} -eq 1 ]; then
-        log "ℹ️  Adding label: ${LABELS[0]}"
+        log "ℹ️ Adding label: ${LABELS[0]}"
     elif [ ${#LABELS[@]} -gt 1 ]; then
-        log "ℹ️  Adding labels:"
+        log "ℹ️ Adding labels:"
         for label in "${LABELS[@]}"; do
             log "      - $label"
         done
@@ -399,9 +399,9 @@ log_labels() {
 
 log_post_commands() {
     if [ ${#POST_COMMANDS[@]} -eq 1 ]; then
-        log "ℹ️  Adding post-command: ${POST_COMMANDS[0]}"
+        log "ℹ️ Adding post-command: ${POST_COMMANDS[0]}"
     elif [ ${#POST_COMMANDS[@]} -gt 1 ]; then
-        log "ℹ️  Adding post-commands:"
+        log "ℹ️ Adding post-commands:"
         for cmd in "${POST_COMMANDS[@]}"; do
             log "      - $cmd"
         done

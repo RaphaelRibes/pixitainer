@@ -239,7 +239,7 @@ validate_docker_args() {
 stage_docker_files() {
     COPY_EXTRA_LINES=""
     if [ ${#EXTRA_FILES[@]} -gt 0 ]; then
-        log "ℹ️  Staging extra files:"
+        log "ℹ️ Staging extra files:"
         for file_spec in "${EXTRA_FILES[@]}"; do
             local src dest src_abs staged_name
             if [[ "$file_spec" == *":"* ]]; then
@@ -321,9 +321,9 @@ generate_dockerfile() {
     local build_arg_lines=""
     if [ ${#BUILD_ARGS[@]} -gt 0 ]; then
         if [ ${#BUILD_ARGS[@]} -eq 1 ]; then
-            log "ℹ️  Adding build-arg: ${BUILD_ARGS[0]}"
+            log "ℹ️ Adding build-arg: ${BUILD_ARGS[0]}"
         else
-            log "ℹ️  Adding build-args:"
+            log "ℹ️ Adding build-args:"
             for ba in "${BUILD_ARGS[@]}"; do log "      - $ba"; done
         fi
         for ba in "${BUILD_ARGS[@]}"; do
@@ -335,7 +335,7 @@ generate_dockerfile() {
     # --- Seamless mode ---
     local entrypoint_line cmd_line
     if [ "$SEAMLESS" = true ]; then
-        log "ℹ️  Seamless mode enabled"
+        log "ℹ️ Seamless mode enabled"
         entrypoint_line='ENTRYPOINT ["pixi", "run", "--as-is", "-m", "'"$MANIFEST_DEST"'"]'
         cmd_line='CMD []'
     else
@@ -346,13 +346,13 @@ generate_dockerfile() {
     # --- User / workdir ---
     local user_line=""
     if [ -n "$USER_OVERRIDE" ]; then
-        log "ℹ️  Container will run as user: $USER_OVERRIDE"
+        log "ℹ️ Container will run as user: $USER_OVERRIDE"
         user_line="USER $USER_OVERRIDE"
     fi
 
     local effective_workdir="/opt/conf"
     if [ -n "$WORKDIR_OVERRIDE" ]; then
-        log "ℹ️  Overriding container WORKDIR to: $WORKDIR_OVERRIDE"
+        log "ℹ️ Overriding container WORKDIR to: $WORKDIR_OVERRIDE"
         effective_workdir="$WORKDIR_OVERRIDE"
     fi
 
@@ -380,6 +380,7 @@ $label_lines
 
 # --- Environment ---
 ENV PIXI_HOME=/opt/pixi
+ENV PIXI_DIR=/opt/pixi
 ENV PATH="/opt/pixi/bin:\$PATH"
 ENV PIXI_PROJECT_MANIFEST=$MANIFEST_DEST
 $pixi_version_env_line
@@ -484,7 +485,7 @@ run_docker_build() {
 
     # Extra tags
     for tag in "${EXTRA_TAGS[@]}"; do
-        log "ℹ️  Adding extra tag: $tag"
+        log "ℹ️ Adding extra tag: $tag"
         cmd+=(-t "$tag")
     done
 
@@ -499,15 +500,15 @@ run_docker_build() {
             rm -rf "$TMP_DIR"
             exit 1
         fi
-        log "ℹ️  Build-time network mode: $NETWORK"
+        log "ℹ️ Build-time network mode: $NETWORK"
         cmd+=(--network "$NETWORK")
     fi
 
     for ba in "${BUILD_ARGS[@]}";  do cmd+=(--build-arg "$ba"); done
-    for secret in "${SECRETS[@]}"; do log "ℹ️  Mounting secret: $secret";       cmd+=(--secret "$secret"); done
-    for agent in "${SSH_AGENTS[@]}"; do log "ℹ️  Forwarding SSH agent: $agent"; cmd+=(--ssh "$agent"); done
-    for cf in "${CACHE_FROM[@]}";  do log "ℹ️  Using cache-from: $cf";          cmd+=(--cache-from "$cf"); done
-    for ct in "${CACHE_TO[@]}";    do log "ℹ️  Exporting cache-to: $ct";        cmd+=(--cache-to "$ct"); done
+    for secret in "${SECRETS[@]}"; do log "ℹ️ Mounting secret: $secret";       cmd+=(--secret "$secret"); done
+    for agent in "${SSH_AGENTS[@]}"; do log "ℹ️ Forwarding SSH agent: $agent"; cmd+=(--ssh "$agent"); done
+    for cf in "${CACHE_FROM[@]}";  do log "ℹ️ Using cache-from: $cf";          cmd+=(--cache-from "$cf"); done
+    for ct in "${CACHE_TO[@]}";    do log "ℹ️ Exporting cache-to: $ct";        cmd+=(--cache-to "$ct"); done
 
     [ "$NEED_BUILDX" = true ] && [ "$PUSH" = true ] && cmd+=(--push)
 
@@ -617,10 +618,9 @@ fi
 
 # --- Keep Dockerfile ---
 if [ "$KEEP_DEF" = true ]; then
-    SAFE_TAG=$(echo "$OUTPUT" | tr '/:' '_')
-    FINAL_DOCKERFILE="$(pwd -P)/Dockerfile.$SAFE_TAG"
+    FINAL_DOCKERFILE="$(pwd -P)/Dockerfile"
     cp "$DOCKERFILE" "$FINAL_DOCKERFILE"
-    log "ℹ️  Dockerfile kept at: $FINAL_DOCKERFILE"
+    log "ℹ️ Dockerfile kept at: $FINAL_DOCKERFILE"
 fi
 
 # --- Cleanup ---

@@ -35,14 +35,14 @@ build_sif_files_section() {
         local file_spec="${EXTRA_FILES[0]}"
         if [[ "$file_spec" == *":"* ]]; then
             local src="${file_spec%%:*}" dest="${file_spec#*:}"
-            log "ℹ️  Adding file: $src -> $dest"
+            log "ℹ️ Adding file: $src -> $dest"
             FILES_SECTION="$FILES_SECTION"$'\n'"    \"$src\" \"$dest\""
         else
-            log "ℹ️  Adding file: $file_spec"
+            log "ℹ️ Adding file: $file_spec"
             FILES_SECTION="$FILES_SECTION"$'\n'"    \"$file_spec\""
         fi
     elif [ ${#EXTRA_FILES[@]} -gt 1 ]; then
-        log "ℹ️  Adding files:"
+        log "ℹ️ Adding files:"
         for file_spec in "${EXTRA_FILES[@]}"; do
             if [[ "$file_spec" == *":"* ]]; then
                 local src="${file_spec%%:*}" dest="${file_spec#*:}"
@@ -74,7 +74,7 @@ format_sif_labels() {
 # ---------------------------------------------------------------------------
 build_sif_runscript() {
     if [ "$SEAMLESS" = true ]; then
-        log "ℹ️  Seamless mode enabled"
+        log "ℹ️ Seamless mode enabled"
         RUNSCRIPT_CONTENT="pixi run --locked --as-is -m $MANIFEST_DEST \"\$@\""
     else
         RUNSCRIPT_CONTENT='exec "$@"'
@@ -105,6 +105,7 @@ $FILES_SECTION
 
 %environment
     export PIXI_HOME=/opt/pixi
+    export PIXI_DIR=/opt/pixi
     export PIXI_PROJECT_MANIFEST=$MANIFEST_DEST
     export PATH="/opt/pixi/bin:\$PATH"
 
@@ -145,6 +146,7 @@ $FILES_SECTION
 
     # 2. Install Pixi globally to /opt/pixi
     export PIXI_HOME=/opt/pixi
+    export PIXI_DIR=/opt/pixi
     echo "STEP: Downloading Pixi"
     curl -fsSL https://pixi.sh/install.sh | bash
     export PATH="/opt/pixi/bin:\$PATH"
@@ -268,7 +270,7 @@ sif_final_cleanup() {
     if [ "$KEEP_DEF" = true ]; then
         local final_def="$OUTPUT_PARENT/$(basename "${OUTPUT%.*}").def"
         mv "$TARGET_DEF" "$final_def"
-        log "ℹ️  Definition file kept at: $final_def"
+        log "ℹ️ Definition file kept at: $final_def"
     fi
     if [ -d "$TMP_DIR" ]; then
         rm -rf "$TMP_DIR"
