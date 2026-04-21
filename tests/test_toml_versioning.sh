@@ -4,11 +4,10 @@ set -e
 cd "$REPO_DIR"
 
 # Cleanup
-rm -rf .gitignore .pixi toml_pversion.sif pixi.toml toml_pversion.def
+rm -rf .gitignore toml_pversion.sif toml_pversion.def
+cp pixi.toml pixi.toml.bak
 
-echo "Initializing simple pixi project for versioning TOML testing..."
-pixi init .
-pixi add python
+echo "Using base project for versioning TOML testing..."
 
 cat << 'EOF' >> pixi.toml
 
@@ -40,14 +39,9 @@ fi
 
 echo "Testing 'latest' option..."
 rm -rf toml_pversion.sif toml_pversion.def
-cat << 'EOF' > pixi.toml
-[project]
-name = "test"
-channels = ["conda-forge"]
-platforms = ["linux-64"]
-
-[dependencies]
-python = "*"
+# Restore backup and append new test config
+mv pixi.toml.bak pixi.toml
+cat << 'EOF' >> pixi.toml
 
 [tool.pixitainer]
 output = "toml_pversion.sif"

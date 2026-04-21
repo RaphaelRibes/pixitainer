@@ -4,12 +4,9 @@ set -e
 cd "$REPO_DIR"
 
 # Cleanup previous isolated run, if any
-rm -rf .gitignore .pixi pixitainer.sif toml_test.sif pixi.toml
+rm -rf .gitignore pixitainer.sif toml_test.sif
 
-echo "Initializing simple pixi project for TOML testing..."
-# Create an isolated project
-pixi init .
-pixi add python
+echo "Using base project for TOML testing..."
 
 # Append the pixitainer config options to the generated pixi.toml
 cat << 'EOF' >> pixi.toml
