@@ -618,7 +618,8 @@ fi
 
 # --- Keep Dockerfile ---
 if [ "$KEEP_DEF" = true ]; then
-    FINAL_DOCKERFILE="$(pwd -P)/Dockerfile"
+    SAFE_TAG=$(echo "$OUTPUT" | tr '/:' '_')
+    FINAL_DOCKERFILE="$(pwd -P)/Dockerfile.$SAFE_TAG"
     cp "$DOCKERFILE" "$FINAL_DOCKERFILE"
     log "ℹ️ Dockerfile kept at: $FINAL_DOCKERFILE"
 fi
