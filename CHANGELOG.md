@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0] - 2026-04-22
+
+### 🚀 Features
+
+- Added support for Docker as a container backend (`pixi-containerize-docker`)
+- Intelligent OS detection to automatically map unsupported distributions to appropriate Docker Hub base images
+- Dynamic cross-platform package manager support (`apt`, `pacman`, `dnf`, `yum`, `apk`, `zypper`) for robust container builds
+- Improved error messaging with actionable suggestions when base image authentication fails
+
+### 💼 Other
+
+- Major codebase refactoring: split monolithic scripts into modular libraries (`lib/`) for improved maintainability
+
 ## [0.6.2] - 2026-03-20
 
 ### 🚀 Features
