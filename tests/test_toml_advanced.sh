@@ -4,11 +4,9 @@ set -e
 cd "$REPO_DIR"
 
 # Cleanup
-rm -rf .gitignore .pixi toml_advanced.sif pixi.toml toml_advanced.def output.log
+rm -rf .gitignore toml_advanced.sif toml_advanced.def output.log
 
-echo "Initializing simple pixi project for advanced TOML testing..."
-pixi init .
-pixi add python
+echo "Using base project for advanced TOML testing..."
 
 cat << 'EOF' >> pixi.toml
 

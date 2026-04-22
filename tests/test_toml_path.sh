@@ -4,15 +4,13 @@ set -e
 cd "$REPO_DIR"
 
 # Cleanup
-rm -rf .gitignore .pixi toml_path.sif pixi.toml subdir
+rm -rf .gitignore toml_path.sif subdir
+
+echo "Setting up an inner project in subdir by copying base environment..."
 mkdir subdir
-cd subdir
-pixi init .
-pixi add python
-cd ..
-
-echo "Initializing project in subdir..."
-
+cp pixi.toml subdir/
+cp pixi.lock subdir/ 2>/dev/null || true
+cp -r .pixi subdir/ 2>/dev/null || true
 cat << 'EOF' >> pixi.toml
 
 [tool.pixitainer]

@@ -24,6 +24,15 @@ if ! grep -q "Seamless mode enabled" "$OUTPUT_LOG"; then
     exit 1
 fi
 
+# Verify the runscript uses --locked (consistent with Docker seamless entrypoint)
+echo "Verifying --locked is present in seamless runscript..."
+DEF_OUTPUT=$($PIXI_CMD -o "$IMAGE_NAME" --seamless --dry-run 2>/dev/null)
+if [[ ! "$DEF_OUTPUT" =~ "pixi run --locked --as-is" ]]; then
+    echo "Error: '--locked' not found in seamless runscript. Got: $DEF_OUTPUT"
+    exit 1
+fi
+echo "Success: '--locked' correctly present in seamless runscript."
+
 if [ ! -f "$IMAGE_NAME" ]; then
     echo "Error: $IMAGE_NAME not found."
     exit 1

@@ -4,11 +4,10 @@ set -e
 cd "$REPO_DIR"
 
 # Cleanup
-rm -rf .gitignore .pixi toml_pversion.sif pixi.toml toml_pversion.def
+rm -rf .gitignore toml_pversion.sif toml_pversion.def
+cp pixi.toml pixi.toml.bak
 
-echo "Initializing simple pixi project for versioning TOML testing..."
-pixi init .
-pixi add python
+echo "Using base project for versioning TOML testing..."
 
 cat << 'EOF' >> pixi.toml
 
@@ -39,15 +38,10 @@ if ! grep -q "pixi self-update --version 0.64.0" toml_pversion.def; then
 fi
 
 echo "Testing 'latest' option..."
-rm -rf toml_pversion.sif toml_pversion.def
-cat << 'EOF' > pixi.toml
-[project]
-name = "test"
-channels = ["conda-forge"]
-platforms = ["linux-64"]
-
-[dependencies]
-python = "*"
+rm -f toml_pversion.sif toml_pversion.def
+# Restore backup and append new test config
+mv pixi.toml.bak pixi.toml
+cat << 'EOF' >> pixi.toml
 
 [tool.pixitainer]
 output = "toml_pversion.sif"
@@ -56,6 +50,11 @@ latest = "True"
 EOF
 
 $PIXI_CMD
+
+if [ ! -f "toml_pversion.def" ]; then
+    echo "Error: toml_pversion.def not found for latest build."
+    exit 1
+fi
 
 if grep -q "pixi self-update" toml_pversion.def; then
     echo "Error: latest=true should not specify self-update in def file."

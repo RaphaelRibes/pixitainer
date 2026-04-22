@@ -23,7 +23,7 @@ if [ $EXIT_CODE -ne 0 ]; then
 fi
 
 # Check for log output (bulleted format)
-if ! grep -q "ℹ️  Adding files:" "$OUTPUT_LOG"; then
+if ! grep -q "ℹ️ Adding files:" "$OUTPUT_LOG"; then
     echo "Error: 'Adding files:' header not found."
     cat "$OUTPUT_LOG"
     exit 1

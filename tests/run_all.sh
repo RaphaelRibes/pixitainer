@@ -25,10 +25,10 @@ TESTS_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 
 if [[ "$TOOL" == "singularity" ]]; then
     TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize-singularity"
-    CONTAINER_CMD="singularity"
+    CONTAINER_CMD="pixi run singularity"
 else
     TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize"
-    CONTAINER_CMD="pixi run -m $(cd "$(dirname "$0")/.." && pwd -P)/pixi.toml apptainer"
+    CONTAINER_CMD="pixi run apptainer"
 fi
 
 # Base directory for individual test workspaces
@@ -92,12 +92,7 @@ chmod +x "$TOOL_SCRIPT"
 
 # Define the PIXI_CMD with the -p argument pointing to the test repo copy.
 # Will be evaluated inside run_test_isolated
-if [[ "$TOOL" == "singularity" ]]; then
-    # Singularity is a system command, no need to run through pixi
-    export PIXI_CMD_TEMPLATE="$TOOL_SCRIPT -p"
-else
-    export PIXI_CMD_TEMPLATE="pixi run -m $(dirname "$TOOL_SCRIPT")/pixi.toml $TOOL_SCRIPT -p"
-fi
+export PIXI_CMD_TEMPLATE="pixi run -m $(dirname "$TOOL_SCRIPT")/pixi.toml $TOOL_SCRIPT -p"
 
 # PIDs array to keep track of background processes
 pids=()

@@ -1,0 +1,579 @@
+#!/bin/bash
+set -e
+
+# Load shared library.
+# When installed via conda/pixi: CONDA_PREFIX is set → libs live under $CONDA_PREFIX/opt/pixitainer.
+# When run directly from the repo during development: resolve relative to the script itself.
+if [ -n "$CONDA_PREFIX" ] && [ -d "$CONDA_PREFIX/opt/pixitainer" ]; then
+    _PIXITAINER_LIB="$CONDA_PREFIX/opt/pixitainer"
+else
+    _PIXITAINER_LIB="$(cd "$(dirname "$0")" && pwd -P)/lib"
+fi
+source "$_PIXITAINER_LIB/common.sh"
+
+BOOTSTRAP_SH="$_PIXITAINER_LIB/bootstrap.sh"
+
+# --- Backend identity ---
+BACKEND="docker"
+OUTPUT="pixitainer:latest"
+
+# --- Docker-specific defaults ---
+NO_CACHE=false
+PUSH=false
+SQUASH=false
+PLATFORM=""
+NETWORK=""
+USER_OVERRIDE=""
+WORKDIR_OVERRIDE=""
+SAVE_FILE=""
+declare -a BUILD_ARGS=() SECRETS=() SSH_AGENTS=() EXTRA_TAGS=() CACHE_FROM=() CACHE_TO=()
+
+# --- Help ---
+usage() {
+    echo "Usage: pixi containerize-docker [options]"
+    echo ""
+    echo "Pixi extension to containerize a project with Docker."
+    echo "Version: $PIXITAINER_VERSION"
+    echo ""
+
+    echo "Core Options:"
+    echo "  -o, --output TAG          Docker image tag (default: pixitainer:latest)"
+    echo "  -p, --path PATH           Working directory (source project)"
+    echo "  -s, --seamless            Enable seamless execution"
+    echo ""
+
+    echo "Environment & Image Setup:"
+    echo "  -b, --base-image IMAGE    Specify base image (default: auto-detected from host)"
+    echo "  -e, --env ENV             Specific environment(s) to install (can be used multiple times)"
+    echo "  -n, --no-install          Do not install any environments"
+    echo ""
+
+    echo "Pixi Versioning:"
+    echo "  -V, --pixi-version VER    Specify pixi version (default: same as host)"
+    echo "  -L, --latest              Force the use of the latest pixi version (cannot be used with -V)"
+    echo ""
+
+    echo "Advanced Modifications:"
+    echo "  -a, --add-file SRC:DEST   Add a file/folder to the image (format: source:destination)"
+    echo "  -c, --post-command CMD    Add a RUN command after environment install (can be used multiple times)"
+    echo "  -l, --label KEY:VALUE     Add a custom LABEL to the image (can be used multiple times)"
+    echo "  -k, --keep-def            Keep the generated Dockerfile (do not delete it)"
+    echo ""
+
+    echo "Docker-specific Options:"
+    echo "  --no-cache                Build the Docker image without cache"
+    echo "  --push                    Push the image to a registry after building"
+    echo "  --platform PLATFORM       Target platform(s) for the build (e.g. linux/amd64,linux/arm64)"
+    echo "                            Note: multi-platform builds require docker buildx"
+    echo "  --squash                  Squash all layers into a single layer (requires experimental daemon)"
+    echo "  --network MODE            Set build-time network mode: bridge (default), host, none"
+    echo "  --build-arg KEY=VAL       Set a build-time ARG variable (can be used multiple times)"
+    echo "  --secret ID:src=FILE      Mount a BuildKit secret during build (never baked into layers)"
+    echo "                            Example: --secret id=pixi_token,src=\$HOME/.pixi/token"
+    echo "  --ssh AGENT               Forward SSH agent into the build (e.g. --ssh default)"
+    echo "                            Requires DOCKER_BUILDKIT=1 and an active ssh-agent"
+    echo "  -t, --tag TAG             Add an extra tag to the image (can be used multiple times)"
+    echo "  --cache-from IMAGE        Reuse cache from an existing image (e.g. a registry image for CI)"
+    echo "                            Example: --cache-from type=registry,ref=ghcr.io/me/img:cache"
+    echo "  --cache-to SPEC           Export cache after build (e.g. type=inline or type=registry,...)"
+    echo "  --save FILE               Export the built image to a .tar.gz archive (docker save | gzip)"
+    echo "                            Useful on HPC clusters without registry access"
+    echo "  --user USER               Run the container as USER (adds USER instruction to Dockerfile)"
+    echo "  --workdir PATH            Override the default working directory inside the container"
+    echo ""
+
+    echo "Output Options:"
+    echo "  -d, --dry-run             Output the Dockerfile to stdout without building the image"
+    echo ""
+
+    echo "General Options:"
+    echo "  -q, --quiet               Quiet mode (suppress all output, return 0 on success, 1 on error)"
+    echo "  -v, --verbose             Verbose mode (show full Docker build output)"
+    echo "  -h, --help                Show this help message"
+}
+
+# ---------------------------------------------------------------------------
+# Docker-specific TOML key handler (called by read_toml_config for unknown keys)
+# ---------------------------------------------------------------------------
+apply_toml_backend() {
+    local key="$1"
+    local val="$2"
+    local reset_mode="${3:-false}"
+
+    local clean_val
+    clean_val=$(echo "$val" | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+
+    case "$key" in
+        no-cache)  _toml_set_bool NO_CACHE "$clean_val" ;;
+        push)      _toml_set_bool PUSH     "$clean_val" ;;
+        squash)    _toml_set_bool SQUASH   "$clean_val" ;;
+        platform)  PLATFORM="$clean_val" ;;
+        network)   NETWORK="$clean_val" ;;
+        user)      USER_OVERRIDE="$clean_val" ;;
+        workdir)   WORKDIR_OVERRIDE="$clean_val" ;;
+        save)      SAVE_FILE="$clean_val" ;;
+        build-arg|secret|ssh|tag|cache-from|cache-to)
+            _apply_docker_array "$key" "$val" "$reset_mode"
+            ;;
+    esac
+}
+
+# Internal: parse docker-specific TOML arrays.
+# When reset_mode=true the target array is cleared unconditionally, so an empty
+# subtable array correctly replaces the general array.
+_apply_docker_array() {
+    local key="$1"
+    local val="$2"
+    local reset_mode="$3"
+
+    if [ "$reset_mode" = "true" ]; then
+        case "$key" in
+            build-arg)  BUILD_ARGS=() ;;
+            secret)     SECRETS=() ;;
+            ssh)        SSH_AGENTS=() ;;
+            tag)        EXTRA_TAGS=() ;;
+            cache-from) CACHE_FROM=() ;;
+            cache-to)   CACHE_TO=() ;;
+        esac
+    fi
+
+    while read -r elem; do
+        [ -z "$elem" ] && continue
+        local elem_clean="${elem//\"/}"
+        case "$key" in
+            build-arg)  BUILD_ARGS+=("$elem_clean") ;;
+            secret)     SECRETS+=("$elem_clean") ;;
+            ssh)        SSH_AGENTS+=("$elem_clean") ;;
+            tag)        EXTRA_TAGS+=("$elem_clean") ;;
+            cache-from) CACHE_FROM+=("$elem_clean") ;;
+            cache-to)   CACHE_TO+=("$elem_clean") ;;
+        esac
+    done < <(echo "$val" | grep -o '"[^"]*"')
+}
+
+# ---------------------------------------------------------------------------
+# Parse Docker-specific CLI arguments from REMAINING_ARGS.
+# ---------------------------------------------------------------------------
+parse_docker_args() {
+    set -- "${REMAINING_ARGS[@]}"
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --no-cache)   NO_CACHE=true;              shift   ;;
+            --push)       PUSH=true;                  shift   ;;
+            --squash)     SQUASH=true;                shift   ;;
+            --platform)   PLATFORM="$2";              shift 2 ;;
+            --network)    NETWORK="$2";               shift 2 ;;
+            --build-arg)  BUILD_ARGS+=("$2");         shift 2 ;;
+            --secret)     SECRETS+=("$2");            shift 2 ;;
+            --ssh)        SSH_AGENTS+=("$2");         shift 2 ;;
+            -t|--tag)     EXTRA_TAGS+=("$2");         shift 2 ;;
+            --cache-from) CACHE_FROM+=("$2");         shift 2 ;;
+            --cache-to)   CACHE_TO+=("$2");           shift 2 ;;
+            --save)       SAVE_FILE="$2";             shift 2 ;;
+            --user)       USER_OVERRIDE="$2";         shift 2 ;;
+            --workdir)    WORKDIR_OVERRIDE="$2";      shift 2 ;;
+            *)
+                echo "Error: Unknown option: $1"
+                usage
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# ---------------------------------------------------------------------------
+# Docker-specific argument validation.
+# ---------------------------------------------------------------------------
+validate_docker_args() {
+    if [ -n "$PLATFORM" ] && ! docker buildx version > /dev/null 2>&1; then
+        echo "Error: --platform requires docker buildx, which is not available."
+        exit 1
+    fi
+
+    USE_BUILDKIT=false
+    if [ ${#SECRETS[@]} -gt 0 ] || [ ${#SSH_AGENTS[@]} -gt 0 ] || [ ${#CACHE_FROM[@]} -gt 0 ] || [ ${#CACHE_TO[@]} -gt 0 ]; then
+        USE_BUILDKIT=true
+        if ! docker buildx version > /dev/null 2>&1; then
+            echo "Error: --secret, --ssh, --cache-from, and --cache-to require docker buildx (BuildKit)."
+            exit 1
+        fi
+    fi
+
+    if [ "$SQUASH" = true ]; then
+        if ! docker info 2>/dev/null | grep -q '"Experimental": true\|experimental: true'; then
+            echo "⚠️  Warning: --squash requires experimental features enabled in the Docker daemon."
+            echo "   Add { \"experimental\": true } to /etc/docker/daemon.json and restart Docker."
+        fi
+    fi
+
+    if [ -n "$SAVE_FILE" ] && [ "$PUSH" = true ]; then
+        echo "Error: --save and --push cannot be used together."
+        exit 1
+    fi
+
+    if [ -n "$PLATFORM" ] && [ ${#EXTRA_TAGS[@]} -gt 0 ] && [ "$PUSH" = false ] && [ -z "$SAVE_FILE" ]; then
+        echo "⚠️  Warning: multi-platform builds with --platform only support loading a single image locally."
+        echo "   Consider adding --push or --save to export the multi-platform manifest."
+    fi
+
+    if ! command -v docker &> /dev/null; then
+        echo "Error: docker is not installed or not in PATH."
+        exit 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Stage extra files into Docker build context.
+# $1 = TMP_DIR
+# Sets: COPY_EXTRA_LINES
+# ---------------------------------------------------------------------------
+stage_docker_files() {
+    COPY_EXTRA_LINES=""
+    if [ ${#EXTRA_FILES[@]} -gt 0 ]; then
+        log "ℹ️ Staging extra files:"
+        for file_spec in "${EXTRA_FILES[@]}"; do
+            local src dest src_abs staged_name
+            if [[ "$file_spec" == *":"* ]]; then
+                src="${file_spec%%:*}"
+                dest="${file_spec#*:}"
+            else
+                src="$file_spec"
+                dest="/opt/conf/$(basename "$file_spec")"
+            fi
+            log "      - $src -> $dest"
+
+            if [[ "$src" != /* ]]; then
+                src_abs="$WD/$src"
+            else
+                src_abs="$src"
+            fi
+
+            if [ ! -e "$src_abs" ]; then
+                echo "Error: Extra file/directory not found: $src_abs"
+                rm -rf "$TMP_DIR"
+                exit 1
+            fi
+
+            staged_name="extra_$(echo "$src" | tr '/' '_' | tr ' ' '_')"
+            cp -r "$src_abs" "$TMP_DIR/ctx/$staged_name"
+            COPY_EXTRA_LINES="$COPY_EXTRA_LINES"$'\n'"COPY ctx/$staged_name $dest"
+        done
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Generate the Dockerfile.
+# Sets: DOCKERFILE
+# ---------------------------------------------------------------------------
+generate_dockerfile() {
+    DOCKERFILE="$TMP_DIR/Dockerfile"
+
+    # --- Pixi version (resolved from common.sh) ---
+    resolve_pixi_version
+    local pixi_version_env_line=""
+    if [ -n "$PIXI_INSTALL_VER" ]; then
+        # Setting PIXI_VERSION env before install.sh pins the installer to
+        # this version, avoiding an extra self-update step.
+        pixi_version_env_line="ENV PIXI_VERSION=$PIXI_INSTALL_VER"
+    fi
+
+    # --- Labels ---
+    local label_lines
+    label_lines="LABEL Created_With=\"Pixitainer (https://github.com/RaphaelRibes/pixitainer)\" \\"$'\n'"      Pixitainer_Version=\"$PIXITAINER_VERSION\" \\"$'\n'"      Pixi_Version=\"$PIXI_VERSION\""
+
+    log_labels
+    for label in "${LABELS[@]}"; do
+        local lkey="${label%%:*}" lval="${label#*:}"
+        label_lines="$label_lines"$'\n'"LABEL $lkey=\"$lval\""
+    done
+
+    # --- Post commands ---
+    local post_run_lines=""
+    log_post_commands
+    for cmd in "${POST_COMMANDS[@]}"; do
+        post_run_lines="$post_run_lines"$'\n'"RUN $cmd"
+    done
+
+    # --- Build-arg ARG declarations ---
+    local build_arg_lines=""
+    if [ ${#BUILD_ARGS[@]} -gt 0 ]; then
+        if [ ${#BUILD_ARGS[@]} -eq 1 ]; then
+            log "ℹ️ Adding build-arg: ${BUILD_ARGS[0]}"
+        else
+            log "ℹ️ Adding build-args:"
+            for ba in "${BUILD_ARGS[@]}"; do log "      - $ba"; done
+        fi
+        for ba in "${BUILD_ARGS[@]}"; do
+            local argkey="${ba%%=*}"
+            build_arg_lines="$build_arg_lines"$'\n'"ARG $argkey"
+        done
+    fi
+
+    # --- Seamless mode ---
+    local entrypoint_line cmd_line
+    if [ "$SEAMLESS" = true ]; then
+        log "ℹ️ Seamless mode enabled"
+        entrypoint_line='ENTRYPOINT ["pixi", "run", "--locked", "--as-is", "-m", "'"$MANIFEST_DEST"'"]'
+        cmd_line='CMD []'
+    else
+        entrypoint_line='ENTRYPOINT ["/bin/bash", "-c", "exec \"$@\"", "--"]'
+        cmd_line='CMD ["/bin/bash"]'
+    fi
+
+    # --- User / workdir ---
+    local user_line=""
+    if [ -n "$USER_OVERRIDE" ]; then
+        log "ℹ️ Container will run as user: $USER_OVERRIDE"
+        user_line="USER $USER_OVERRIDE"
+    fi
+
+    local effective_workdir="/opt/conf"
+    if [ -n "$WORKDIR_OVERRIDE" ]; then
+        log "ℹ️ Overriding container WORKDIR to: $WORKDIR_OVERRIDE"
+        effective_workdir="$WORKDIR_OVERRIDE"
+    fi
+
+    # --- Lock file ---
+    local lock_copy_line manifest_basename
+    manifest_basename=$(basename "$MANIFEST_SRC")
+    if [ -f "$PIXI_LOCK" ]; then
+        lock_copy_line="COPY ctx/pixi.lock /opt/conf/pixi.lock"
+    else
+        lock_copy_line="# (no pixi.lock found)"
+    fi
+
+    # --- Install command ---
+    build_install_cmd "--no-progress "
+
+    # --- Write Dockerfile ---
+    cat <<EOF > "$DOCKERFILE"
+# Generated by Pixitainer $PIXITAINER_VERSION
+# https://github.com/RaphaelRibes/pixitainer
+
+FROM $BASE_IMAGE
+$build_arg_lines
+
+$label_lines
+
+# --- Environment ---
+ENV PIXI_HOME=/opt/pixi
+ENV PIXI_DIR=/opt/pixi
+ENV PATH="/opt/pixi/bin:\$PATH"
+ENV PIXI_PROJECT_MANIFEST=$MANIFEST_DEST
+$pixi_version_env_line
+
+# --- Copy project files ---
+COPY ctx/bootstrap.sh /opt/bootstrap.sh
+COPY ctx/$manifest_basename $MANIFEST_DEST
+$lock_copy_line
+$COPY_EXTRA_LINES
+
+# --- Install system dependencies & Pixi ---
+RUN set -e \\
+    && . /opt/bootstrap.sh \\
+    && bootstrap_install \\
+    && bootstrap_cleanup
+
+# --- Install the Pixi environment ---
+WORKDIR $effective_workdir
+RUN pixi config set --local run-post-link-scripts insecure \\
+    && $INSTALL_CMD \\
+    && pixi clean cache --yes
+$post_run_lines
+
+# --- Runtime user ---
+$user_line
+
+# --- Entrypoint ---
+$entrypoint_line
+$cmd_line
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Docker step extractor for the spinner.
+# ---------------------------------------------------------------------------
+_docker_step_extractor() {
+    local line="$1"
+    # Classic docker build: "Step N/M : INSTRUCTION ..."
+    if [[ "$line" =~ ^Step\ ([0-9]+)/([0-9]+)\ :\ (.+)$ ]]; then
+        echo "[${BASH_REMATCH[1]}/${BASH_REMATCH[2]}] ${BASH_REMATCH[3]}"
+    # BuildKit / buildx: "#N [stage description] INSTRUCTION ..."
+    elif [[ "$line" =~ ^#([0-9]+)\ \[([^]]+)\]\ (.+)$ ]]; then
+        echo "[#${BASH_REMATCH[1]} ${BASH_REMATCH[2]}] ${BASH_REMATCH[3]}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Build the Docker image.
+# ---------------------------------------------------------------------------
+run_docker_build() {
+    log "🚀 Starting Docker build..."
+
+    # Decide whether to use buildx
+    NEED_BUILDX=false
+    [ -n "$PLATFORM" ] && NEED_BUILDX=true
+    [ "$USE_BUILDKIT" = true ] && NEED_BUILDX=true
+
+    local -a cmd
+    if [ "$NEED_BUILDX" = true ]; then
+        cmd=(docker buildx build --progress=plain)
+        if [ "$PUSH" = false ] && [ -z "$SAVE_FILE" ] && [ -z "$PLATFORM" ]; then
+            cmd+=(--load)
+        fi
+        [ -n "$PLATFORM" ] && cmd+=(--platform "$PLATFORM")
+    else
+        cmd=(docker build)
+    fi
+
+    # Primary tag
+    cmd+=(-t "$OUTPUT")
+
+    # Extra tags
+    for tag in "${EXTRA_TAGS[@]}"; do
+        log "ℹ️ Adding extra tag: $tag"
+        cmd+=(-t "$tag")
+    done
+
+    [ "$NO_CACHE" = true ] && cmd+=(--no-cache)
+    [ "$SQUASH" = true ]   && cmd+=(--squash)
+
+    if [ -n "$NETWORK" ]; then
+        if [ "$NEED_BUILDX" = true ] && [ "$NETWORK" = "bridge" ]; then
+            echo "Error: --network bridge is not supported by BuildKit (buildx)."
+            echo "       Use --network host or --network none, or avoid flags that require buildx"
+            echo "       (--platform, --secret, --ssh, --cache-from, --cache-to)."
+            rm -rf "$TMP_DIR"
+            exit 1
+        fi
+        log "ℹ️ Build-time network mode: $NETWORK"
+        cmd+=(--network "$NETWORK")
+    fi
+
+    for ba in "${BUILD_ARGS[@]}";  do cmd+=(--build-arg "$ba"); done
+    for secret in "${SECRETS[@]}"; do log "ℹ️ Mounting secret: $secret";       cmd+=(--secret "$secret"); done
+    for agent in "${SSH_AGENTS[@]}"; do log "ℹ️ Forwarding SSH agent: $agent"; cmd+=(--ssh "$agent"); done
+    for cf in "${CACHE_FROM[@]}";  do log "ℹ️ Using cache-from: $cf";          cmd+=(--cache-from "$cf"); done
+    for ct in "${CACHE_TO[@]}";    do log "ℹ️ Exporting cache-to: $ct";        cmd+=(--cache-to "$ct"); done
+
+    [ "$NEED_BUILDX" = true ] && [ "$PUSH" = true ] && cmd+=(--push)
+
+    cmd+=(-f "$DOCKERFILE" "$TMP_DIR")
+
+    if [ "$QUIET" = true ]; then
+        if ! "${cmd[@]}" > /dev/null 2>&1; then
+            rm -rf "$TMP_DIR"
+            exit 1
+        fi
+    elif [ "$VERBOSE" = true ]; then
+        "${cmd[@]}"
+    else
+        if ! run_with_spinner "Docker" \
+                "Setting up build context" \
+                _docker_step_extractor \
+                "${cmd[@]}"; then
+            echo "--- LOGS ---"
+            cat "$BUILD_LOG_FILE"
+            rm -f "$BUILD_LOG_FILE"
+            rm -rf "$TMP_DIR"
+            exit 1
+        fi
+        rm -f "$BUILD_LOG_FILE"
+    fi
+
+    log "✅ Success! Docker image built: $OUTPUT"
+}
+
+# ===========================================================================
+# Main flow
+# ===========================================================================
+
+# --- Initialisation ---
+init_common_defaults
+detect_base_image
+
+# --- TOML configuration ---
+pre_parse_path "$@"
+find_pre_manifest
+read_toml_config "$BACKEND" "$PRE_MANIFEST_SRC"
+
+# --- CLI parsing ---
+parse_common_args "$@"
+parse_docker_args
+
+# --- Validation ---
+validate_common_args
+validate_docker_args
+
+# --- Resolve paths & manifest ---
+resolve_manifest
+
+# Docker build context
+TMP_DIR="$(pwd -P)/.tmp_pixitainer_docker"
+
+log "📦 Containerizing project from: $WD"
+log "🐳 Docker image tag: $OUTPUT"
+
+# --- Prepare build context ---
+mkdir -p "$TMP_DIR/ctx"
+MANIFEST_BASENAME=$(basename "$MANIFEST_SRC")
+cp "$MANIFEST_SRC" "$TMP_DIR/ctx/$MANIFEST_BASENAME"
+cp "$BOOTSTRAP_SH" "$TMP_DIR/ctx/bootstrap.sh"
+if [ -f "$PIXI_LOCK" ]; then
+    cp "$PIXI_LOCK" "$TMP_DIR/ctx/pixi.lock"
+fi
+
+# --- Stage extra files ---
+stage_docker_files
+
+# --- Generate Dockerfile ---
+generate_dockerfile
+
+# --- Dry-run ---
+if [ "$DRY_RUN" = true ]; then
+    cat "$DOCKERFILE"
+    rm -rf "$TMP_DIR"
+    exit 0
+fi
+
+# --- Build ---
+run_docker_build
+
+# --- Push (classic build only; buildx already pushed) ---
+if [ "$PUSH" = true ] && [ "$NEED_BUILDX" = false ]; then
+    log "📤 Pushing image to registry..."
+    if [ "$QUIET" = true ]; then
+        docker push "$OUTPUT" > /dev/null 2>&1
+    else
+        docker push "$OUTPUT"
+    fi
+    log "✅ Image pushed: $OUTPUT"
+fi
+
+# --- Save image to archive ---
+if [ -n "$SAVE_FILE" ]; then
+    log "💾 Saving image to archive: $SAVE_FILE"
+    SAVE_TAGS=("$OUTPUT")
+    for tag in "${EXTRA_TAGS[@]}"; do SAVE_TAGS+=("$tag"); done
+
+    SAVE_CMD=(docker save "${SAVE_TAGS[@]}")
+    if [ "$QUIET" = true ]; then
+        "${SAVE_CMD[@]}" | gzip > "$SAVE_FILE" 2>/dev/null
+    else
+        "${SAVE_CMD[@]}" | gzip > "$SAVE_FILE"
+    fi
+    log "✅ Image saved to: $SAVE_FILE"
+fi
+
+# --- Keep Dockerfile ---
+if [ "$KEEP_DEF" = true ]; then
+    SAFE_TAG=$(echo "$OUTPUT" | tr '/:' '_')
+    FINAL_DOCKERFILE="$(pwd -P)/Dockerfile.$SAFE_TAG"
+    cp "$DOCKERFILE" "$FINAL_DOCKERFILE"
+    log "ℹ️ Dockerfile kept at: $FINAL_DOCKERFILE"
+fi
+
+# --- Cleanup ---
+if [ -d "$TMP_DIR" ]; then
+    rm -rf "$TMP_DIR"
+fi
