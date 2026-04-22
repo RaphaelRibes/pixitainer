@@ -41,7 +41,7 @@ Singularity is often found on high-performance computing (HPC) clusters and is m
 curl -fsSL https://pixi.sh/install.sh | sh
 ```
 
-Install pixitainer (Apptainer) or pixitainer-singularity (Singularity) globaly on pixi:
+Install pixitainer (Apptainer), pixitainer-singularity (Singularity) or pixitainer-docker (Docker) globaly on pixi:
 
 ```bash
 # For Apptainer
@@ -49,6 +49,9 @@ pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/con
 
 # For Singularity
 pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer-singularity
+
+# For Docker
+pixi global install -c [https://prefix.dev/raphaelribes](https://prefix.dev/raphaelribes) -c [https://prefix.dev/conda-forge](https://prefix.dev/conda-forge) pixitainer-docker
 ```
 
 ### Developer
@@ -98,6 +101,9 @@ pixi containerize
 
 # For Singularity
 pixi containerize-singularity
+
+# For Docker
+pixi containerize-docker
 ```
 
 Then you can use pixi in your image
@@ -108,6 +114,9 @@ apptainer run -f pixitainer.sif pixi run --as-is -m /opt/conf/pixi.toml make_dir
 
 # Singularity
 singularity run -f pixitainer.sif pixi run --as-is -m /opt/conf/pixi.toml make_dir
+
+# Docker
+docker run --rm <your_image_name>:latest pixi run --as-is -m /opt/conf/pixi.toml make_dir
 ```
 
 We add `--as-is` to make sure it sticks to the `pixi.lock` file, and it only uses the installed binaries and doesn't try to install others.
@@ -124,6 +133,9 @@ pixi containerize -s
 
 # For Singularity
 pixi containerize-singularity -s
+
+# For Docker
+pixi containerize-docker -s
 ```
 
 You can then turn your task like pixi is not even here
@@ -134,6 +146,9 @@ apptainer run -f pixitainer.sif make_dir
 
 # Singularity
 singularity run -f pixitainer.sif make_dir
+
+# Docker
+docker run --rm <your_image_name>:latest make_dir
 ```
 
 > **WARNING**: the seamless mode makes that every commands run through the image are ran like so
