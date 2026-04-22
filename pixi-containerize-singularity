@@ -12,9 +12,7 @@ fi
 source "$_PIXITAINER_LIB/common.sh"
 source "$_PIXITAINER_LIB/sif.sh"
 
-# --- Backend identity ---
-BACKEND="singularity"
-OUTPUT="pixitainer.sif"
+BOOTSTRAP_SH="$_PIXITAINER_LIB/bootstrap.sh"
 
 # --- Help ---
 usage() {
@@ -58,48 +56,4 @@ usage() {
     echo "  -h, --help                Show this help message"
 }
 
-# --- Initialisation ---
-init_common_defaults
-detect_base_image
-
-# --- TOML configuration ---
-pre_parse_path "$@"
-find_pre_manifest
-read_toml_config "$BACKEND" "$PRE_MANIFEST_SRC"
-
-# --- CLI parsing ---
-parse_common_args "$@"
-if [ ${#REMAINING_ARGS[@]} -gt 0 ]; then
-    echo "Error: Unknown option: ${REMAINING_ARGS[0]}"
-    usage
-    exit 1
-fi
-
-# --- Validation ---
-validate_common_args
-
-# --- Resolve paths & manifest ---
-resolve_manifest
-resolve_sif_paths
-
-log "📦 Containerizing project from: $WD"
-log "📂 Output target: $OUTPUT_ABS"
-
-# --- Build the definition ---
-build_sif_files_section
-build_install_cmd
-build_sif_runscript
-resolve_pixi_version
-log_labels
-format_sif_labels
-log_post_commands
-generate_def_file
-
-# --- Dry-run check ---
-sif_dry_run_or_cleanup
-
-# --- Build ---
-run_sif_build singularity
-
-# --- Cleanup ---
-sif_final_cleanup
+sif_main singularity "$@"

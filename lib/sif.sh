@@ -24,36 +24,36 @@ resolve_sif_paths() {
 # ---------------------------------------------------------------------------
 # Build the %files section for the .def file.
 # Sets: FILES_SECTION
+# Requires: BOOTSTRAP_SH (set by the entrypoint before calling sif_main)
 # ---------------------------------------------------------------------------
 build_sif_files_section() {
-    FILES_SECTION="    \"$MANIFEST_SRC\" $MANIFEST_DEST"
+    FILES_SECTION="    \"$BOOTSTRAP_SH\" /opt/bootstrap.sh"
+    FILES_SECTION+=$'\n'"    \"$MANIFEST_SRC\" $MANIFEST_DEST"
     if [ -f "$PIXI_LOCK" ]; then
-        FILES_SECTION="$FILES_SECTION"$'\n'"    \"$PIXI_LOCK\" /opt/conf/pixi.lock"
+        FILES_SECTION+=$'\n'"    \"$PIXI_LOCK\" /opt/conf/pixi.lock"
     fi
 
-    if [ ${#EXTRA_FILES[@]} -eq 1 ]; then
-        local file_spec="${EXTRA_FILES[0]}"
+    local count=${#EXTRA_FILES[@]}
+    [ "$count" -eq 0 ] && return
+    [ "$count" -gt 1 ] && log "ℹ️ Adding files:"
+
+    local file_spec src dest label
+    for file_spec in "${EXTRA_FILES[@]}"; do
         if [[ "$file_spec" == *":"* ]]; then
-            local src="${file_spec%%:*}" dest="${file_spec#*:}"
-            log "ℹ️ Adding file: $src -> $dest"
-            FILES_SECTION="$FILES_SECTION"$'\n'"    \"$src\" \"$dest\""
+            src="${file_spec%%:*}"
+            dest="${file_spec#*:}"
+            label="$src -> $dest"
+            FILES_SECTION+=$'\n'"    \"$src\" \"$dest\""
         else
-            log "ℹ️ Adding file: $file_spec"
-            FILES_SECTION="$FILES_SECTION"$'\n'"    \"$file_spec\""
+            label="$file_spec"
+            FILES_SECTION+=$'\n'"    \"$file_spec\""
         fi
-    elif [ ${#EXTRA_FILES[@]} -gt 1 ]; then
-        log "ℹ️ Adding files:"
-        for file_spec in "${EXTRA_FILES[@]}"; do
-            if [[ "$file_spec" == *":"* ]]; then
-                local src="${file_spec%%:*}" dest="${file_spec#*:}"
-                log "      - $src -> $dest"
-                FILES_SECTION="$FILES_SECTION"$'\n'"    \"$src\" \"$dest\""
-            else
-                log "      - $file_spec"
-                FILES_SECTION="$FILES_SECTION"$'\n'"    \"$file_spec\""
-            fi
-        done
-    fi
+        if [ "$count" -eq 1 ]; then
+            log "ℹ️ Adding file: $label"
+        else
+            log "      - $label"
+        fi
+    done
 }
 
 # ---------------------------------------------------------------------------
@@ -110,50 +110,13 @@ $FILES_SECTION
     export PATH="/opt/pixi/bin:\$PATH"
 
 %post
-    export DEBIAN_FRONTEND=noninteractive
+    . /opt/bootstrap.sh
 
-    # 1. Install system dependencies
-    echo "STEP: Updating the image"
-    MISSING_PKGS=""
-    if ! command -v curl >/dev/null 2>&1; then MISSING_PKGS="curl ca-certificates"; fi
-    if ! command -v bash >/dev/null 2>&1; then MISSING_PKGS="\$MISSING_PKGS bash"; fi
-    
-    if [ -n "\$MISSING_PKGS" ]; then
-        if command -v apt-get >/dev/null 2>&1; then
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get update && apt-get install -y --no-install-recommends \$MISSING_PKGS
-            PKGMGR="apt"
-        elif command -v pacman >/dev/null 2>&1; then
-            pacman -Sy --noconfirm \$MISSING_PKGS
-            PKGMGR="pacman"
-        elif command -v dnf >/dev/null 2>&1; then
-            dnf install -y \$MISSING_PKGS
-            PKGMGR="dnf"
-        elif command -v yum >/dev/null 2>&1; then
-            yum install -y \$MISSING_PKGS
-            PKGMGR="yum"
-        elif command -v apk >/dev/null 2>&1; then
-            apk add --no-cache \$MISSING_PKGS
-            PKGMGR="apk"
-        elif command -v zypper >/dev/null 2>&1; then
-            zypper in -y \$MISSING_PKGS
-            PKGMGR="zypper"
-        else
-            echo "Error: No known package manager found"
-            exit 1
-        fi
-    fi
-
-    # 2. Install Pixi globally to /opt/pixi
-    export PIXI_HOME=/opt/pixi
-    export PIXI_DIR=/opt/pixi
-    echo "STEP: Downloading Pixi"
-    curl -fsSL https://pixi.sh/install.sh | bash
-    export PATH="/opt/pixi/bin:\$PATH"
+    echo "STEP: Installing system prerequisites and Pixi"
+    bootstrap_install
 
     $PIXI_VERSION_CMD
 
-    # 3. Setup the Project Environment
     mkdir -p /opt/conf
     cd /opt/conf
 
@@ -161,39 +124,13 @@ $FILES_SECTION
     pixi config set --local run-post-link-scripts insecure
     $INSTALL_CMD
 
-    # 3.5 Run extra post commands
     $(if [ ${#POST_COMMANDS[@]} -gt 0 ]; then
         echo "echo \"STEP: Running extra post commands\""
         printf '    %s\n' "${POST_COMMANDS[@]}"
     fi)
 
-    # 4. Cleanup
     echo "STEP: Cleaning"
-    if [ -n "\$PKGMGR" ]; then
-        if echo "\$MISSING_PKGS" | grep -q "curl"; then
-            if [ "\$PKGMGR" = "apt" ]; then
-                apt-get remove -y curl && apt-get autoremove -y
-            elif [ "\$PKGMGR" = "pacman" ]; then
-                pacman -Rns --noconfirm curl || true
-            elif [ "\$PKGMGR" = "dnf" ] || [ "\$PKGMGR" = "yum" ]; then
-                \$PKGMGR remove -y curl
-            elif [ "\$PKGMGR" = "apk" ]; then
-                apk del curl
-            elif [ "\$PKGMGR" = "zypper" ]; then
-                zypper rm -y curl
-            fi
-        fi
-        
-        if [ "\$PKGMGR" = "apt" ]; then
-            apt-get clean && rm -rf /var/lib/apt/lists/*
-        elif [ "\$PKGMGR" = "pacman" ]; then
-            pacman -Scc --noconfirm || true
-        elif [ "\$PKGMGR" = "dnf" ] || [ "\$PKGMGR" = "yum" ]; then
-            \$PKGMGR clean all
-        elif [ "\$PKGMGR" = "zypper" ]; then
-            zypper clean
-        fi
-    fi
+    bootstrap_cleanup
 
 %runscript
     cd /opt/conf
@@ -247,18 +184,19 @@ run_sif_build() {
 
             echo "--- LOGS ---"
             cat "$BUILD_LOG_FILE"
+            rm -f "$BUILD_LOG_FILE"
             exit 1
         fi
+        rm -f "$BUILD_LOG_FILE"
     fi
 
     log "✅ Success! Image built at: $OUTPUT_ABS"
 }
 
 # ---------------------------------------------------------------------------
-# Handle dry-run output and cleanup for SIF builds.
+# Dry-run handler for SIF builds: if DRY_RUN, print the .def and exit 0.
 # ---------------------------------------------------------------------------
-sif_dry_run_or_cleanup() {
-    # Dry-run: output .def and exit
+sif_dry_run_check() {
     if [ "$DRY_RUN" = true ]; then
         cat "$TARGET_DEF"
         rm -rf "$TMP_DIR"
@@ -275,4 +213,58 @@ sif_final_cleanup() {
     if [ -d "$TMP_DIR" ]; then
         rm -rf "$TMP_DIR"
     fi
+}
+
+# ---------------------------------------------------------------------------
+# Shared entry point for the Apptainer and Singularity entrypoint scripts.
+# Usage: sif_main BACKEND "$@"
+#   BACKEND ∈ {apptainer, singularity}
+# The caller must:
+#   - source common.sh and sif.sh before calling,
+#   - define a `usage` function (invoked by parse_common_args on -h),
+#   - set BOOTSTRAP_SH to the absolute host path of lib/bootstrap.sh.
+# ---------------------------------------------------------------------------
+sif_main() {
+    BACKEND="$1"; shift
+
+    init_common_defaults
+    detect_base_image
+
+    pre_parse_path "$@"
+    find_pre_manifest
+    read_toml_config "$BACKEND" "$PRE_MANIFEST_SRC"
+
+    parse_common_args "$@"
+    if [ ${#REMAINING_ARGS[@]} -gt 0 ]; then
+        echo "Error: Unknown option: ${REMAINING_ARGS[0]}"
+        usage
+        exit 1
+    fi
+
+    validate_common_args
+
+    # Apply default output path after TOML + CLI have both been parsed.
+    # Must sit here so TOML/CLI overrides take priority.
+    OUTPUT="${OUTPUT:-pixitainer.sif}"
+
+    resolve_manifest
+    resolve_sif_paths
+
+    log "📦 Containerizing project from: $WD"
+    log "📂 Output target: $OUTPUT_ABS"
+
+    build_sif_files_section
+    build_install_cmd
+    build_sif_runscript
+    resolve_pixi_version
+    log_labels
+    format_sif_labels
+    log_post_commands
+    generate_def_file
+
+    sif_dry_run_check
+
+    run_sif_build "$BACKEND"
+
+    sif_final_cleanup
 }

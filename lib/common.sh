@@ -127,6 +127,15 @@ parse_toml_section() {
 }
 
 # ---------------------------------------------------------------------------
+# Helper: set a boolean variable from a TOML string value.
+# Usage: _toml_set_bool VARNAME VALUE
+# Sets VARNAME to "true" if VALUE (case-insensitive) is "true", else "false".
+# ---------------------------------------------------------------------------
+_toml_set_bool() {
+    if [[ "${2,,}" == "true" ]]; then printf -v "$1" true; else printf -v "$1" false; fi
+}
+
+# ---------------------------------------------------------------------------
 # Apply a single TOML key/value for the *shared* option set.
 # $1 = key,  $2 = raw value,  $3 = reset_mode ("true" on subtable pass)
 # Returns 0 if the key was handled, 1 if the key is unknown (backend-specific).
@@ -142,22 +151,15 @@ apply_toml_common() {
     case "$key" in
         output)       OUTPUT="$clean_val" ;;
         path)         PROJECT_PATH="$clean_val" ;;
-        seamless)
-            if [[ "${clean_val,,}" == "true" ]]; then SEAMLESS=true; else SEAMLESS=false; fi ;;
+        seamless)     _toml_set_bool SEAMLESS    "$clean_val" ;;
         base-image)   BASE_IMAGE="$clean_val" ;;
-        no-install)
-            if [[ "${clean_val,,}" == "true" ]]; then NO_INSTALL=true; else NO_INSTALL=false; fi ;;
+        no-install)   _toml_set_bool NO_INSTALL  "$clean_val" ;;
         pixi-version) TARGET_PIXI_VERSION="$clean_val" ;;
-        latest)
-            if [[ "${clean_val,,}" == "true" ]]; then LATEST_PIXI=true; else LATEST_PIXI=false; fi ;;
-        keep-def)
-            if [[ "${clean_val,,}" == "true" ]]; then KEEP_DEF=true; else KEEP_DEF=false; fi ;;
-        dry-run)
-            if [[ "${clean_val,,}" == "true" ]]; then DRY_RUN=true; else DRY_RUN=false; fi ;;
-        quiet)
-            if [[ "${clean_val,,}" == "true" ]]; then QUIET=true; else QUIET=false; fi ;;
-        verbose)
-            if [[ "${clean_val,,}" == "true" ]]; then VERBOSE=true; else VERBOSE=false; fi ;;
+        latest)       _toml_set_bool LATEST_PIXI "$clean_val" ;;
+        keep-def)     _toml_set_bool KEEP_DEF    "$clean_val" ;;
+        dry-run)      _toml_set_bool DRY_RUN     "$clean_val" ;;
+        quiet)        _toml_set_bool QUIET       "$clean_val" ;;
+        verbose)      _toml_set_bool VERBOSE     "$clean_val" ;;
         env|add-file|post-command|label)
             _apply_toml_array "$key" "$val" "$reset_mode"
             ;;
@@ -168,34 +170,32 @@ apply_toml_common() {
 }
 
 # Internal helper: parse a TOML array value into the corresponding global array.
+# When reset_mode=true the target array is cleared unconditionally, so that an
+# empty subtable array (e.g. `env = []`) correctly replaces the general array.
 _apply_toml_array() {
     local key="$1"
     local val="$2"
     local reset_mode="$3"
 
-    local elements
-    elements=$(echo "$val" | grep -o '"[^"]*"')
-    local first_elem=true
+    if [ "$reset_mode" = "true" ]; then
+        case "$key" in
+            env)          ENVS=() ;;
+            add-file)     EXTRA_FILES=() ;;
+            post-command) POST_COMMANDS=() ;;
+            label)        LABELS=() ;;
+        esac
+    fi
+
     while read -r elem; do
-        if [ -n "$elem" ]; then
-            local elem_clean="${elem//\"/}"
-            if [ "$reset_mode" = "true" ] && [ "$first_elem" = "true" ]; then
-                case "$key" in
-                    env)          ENVS=() ;;
-                    add-file)     EXTRA_FILES=() ;;
-                    post-command) POST_COMMANDS=() ;;
-                    label)        LABELS=() ;;
-                esac
-                first_elem=false
-            fi
-            case "$key" in
-                env)          ENVS+=("$elem_clean") ;;
-                add-file)     EXTRA_FILES+=("$elem_clean") ;;
-                post-command) POST_COMMANDS+=("$elem_clean") ;;
-                label)        LABELS+=("$elem_clean") ;;
-            esac
-        fi
-    done <<< "$elements"
+        [ -z "$elem" ] && continue
+        local elem_clean="${elem//\"/}"
+        case "$key" in
+            env)          ENVS+=("$elem_clean") ;;
+            add-file)     EXTRA_FILES+=("$elem_clean") ;;
+            post-command) POST_COMMANDS+=("$elem_clean") ;;
+            label)        LABELS+=("$elem_clean") ;;
+        esac
+    done < <(echo "$val" | grep -o '"[^"]*"')
 }
 
 # ---------------------------------------------------------------------------
@@ -362,24 +362,39 @@ build_install_cmd() {
 
 # ---------------------------------------------------------------------------
 # Resolve the pixi version that will be installed inside the container.
-# Sets: PIXI_VERSION, PIXI_VERSION_CMD
-#   PIXI_VERSION     = human-readable version string (for labels)
-#   PIXI_VERSION_CMD = shell command to run after initial pixi install
-#                      (empty string means "keep whatever install.sh gave us")
+# Sets: PIXI_VERSION, PIXI_INSTALL_VER, PIXI_VERSION_CMD
+#   PIXI_VERSION      = human-readable version string (for labels).
+#   PIXI_INSTALL_VER  = version to pin to ("" means "use whatever install.sh
+#                       gives us" — i.e. the latest release). Docker consumes
+#                       this as `ENV PIXI_VERSION=…` before the install RUN.
+#   PIXI_VERSION_CMD  = shell command to run *after* install.sh if the version
+#                       still needs to be pinned (used by the SIF %post flow,
+#                       which calls install.sh without PIXI_VERSION and then
+#                       self-updates). Empty when nothing to do.
 # ---------------------------------------------------------------------------
 resolve_pixi_version() {
-    PIXI_VERSION=$(pixi -V | grep -o " .*$" | tr -d ' ')
-    PIXI_VERSION_CMD=""
+    local host_ver
+    host_ver=$(pixi -V | awk '{print $NF}')
 
     if [ -n "$TARGET_PIXI_VERSION" ]; then
-        PIXI_VERSION_CMD="pixi self-update --version $TARGET_PIXI_VERSION"
         PIXI_VERSION="$TARGET_PIXI_VERSION"
     elif [ "$LATEST_PIXI" = true ]; then
-        PIXI_VERSION_CMD=""
         PIXI_VERSION=$(curl -s https://api.github.com/repos/prefix-dev/pixi/releases/latest \
             | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/')
     else
-        PIXI_VERSION_CMD="pixi self-update --version $PIXI_VERSION"
+        PIXI_VERSION="$host_ver"
+    fi
+
+    if [ "$LATEST_PIXI" = true ]; then
+        PIXI_INSTALL_VER=""
+    else
+        PIXI_INSTALL_VER="$PIXI_VERSION"
+    fi
+
+    if [ -n "$PIXI_INSTALL_VER" ]; then
+        PIXI_VERSION_CMD="pixi self-update --version $PIXI_INSTALL_VER"
+    else
+        PIXI_VERSION_CMD=""
     fi
 }
 
@@ -443,7 +458,6 @@ run_with_spinner() {
     i=0
 
     tput civis 2>/dev/null || true
-    trap 'tput cnorm 2>/dev/null || true; rm -f "$LOG_FILE" "$STEP_FILE"' EXIT
 
     set -o pipefail
     set +e
@@ -465,6 +479,7 @@ run_with_spinner() {
 
     EC=$?
     LAST_STEP=$(cat "$STEP_FILE")
+    tput cnorm 2>/dev/null || true
 
     if [ $EC -eq 0 ]; then
         printf "\r [✅] %s\033[K\n" "$LAST_STEP"
@@ -475,7 +490,9 @@ run_with_spinner() {
         echo ""
     fi
 
-    # Export the log file path so backends can add context-specific hints
+    # STEP_FILE is no longer needed. LOG_FILE is passed to the caller via
+    # BUILD_LOG_FILE and must be removed by the caller once consumed.
+    rm -f "$STEP_FILE"
     BUILD_LOG_FILE="$LOG_FILE"
     return $EC
 }
