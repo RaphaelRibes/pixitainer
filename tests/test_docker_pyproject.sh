@@ -29,7 +29,7 @@ EOF
 pixi lock
 
 echo "Testing pyproject.toml project support..."
-export PIXI_CMD="$TOOL_SCRIPT -p $REPO_DIR"
+export PIXI_CMD="pixi run -m $(dirname "$TOOL_SCRIPT")/pixi.toml $TOOL_SCRIPT -p $REPO_DIR"
 $PIXI_CMD -o "$IMAGE_TAG"
 
 if ! docker image inspect "$IMAGE_TAG" > /dev/null 2>&1; then

@@ -20,7 +20,7 @@ keep-def = "True"
 pixi-version = "0.64.0"
 EOF
 
-export PIXI_CMD="$TOOL_SCRIPT -p $REPO_DIR"
+export PIXI_CMD="pixi run -m $(dirname "$TOOL_SCRIPT")/pixi.toml $TOOL_SCRIPT -p $REPO_DIR"
 $PIXI_CMD
 
 if ! docker image inspect "$IMAGE_TAG" > /dev/null 2>&1; then

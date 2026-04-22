@@ -1,4 +1,4 @@
-h#!/bin/bash
+#!/bin/bash
 set -e
 
 cd "$REPO_DIR"
@@ -32,6 +32,12 @@ fi
 
 if [[ ! "$DEF_OUTPUT" =~ "%runscript" ]]; then
     echo "Error: %runscript section not found in stdout"
+    exit 1
+fi
+
+# bootstrap.sh must be staged into the container via %files
+if [[ ! "$DEF_OUTPUT" =~ "/opt/bootstrap.sh" ]]; then
+    echo "Error: bootstrap.sh not found in %files section"
     exit 1
 fi
 

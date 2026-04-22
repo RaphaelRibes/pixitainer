@@ -39,6 +39,12 @@ if ! echo "$DOCKERFILE_OUTPUT" | grep -q "^COPY "; then
     exit 1
 fi
 
+# bootstrap.sh must be staged into the build context and COPYed in
+if ! echo "$DOCKERFILE_OUTPUT" | grep -q "bootstrap.sh"; then
+    echo "Error: bootstrap.sh not found in Dockerfile COPY section."
+    exit 1
+fi
+
 if ! echo "$DOCKERFILE_OUTPUT" | grep -q "pixi"; then
     echo "Error: pixi install command not found in dry-run output."
     exit 1

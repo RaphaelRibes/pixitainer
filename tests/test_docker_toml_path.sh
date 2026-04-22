@@ -23,7 +23,8 @@ seamless = "True"
 EOF
 
 # Do NOT use PIXI_CMD here — it adds -p which would override the TOML path setting.
-TOOL_RUN="$TOOL_SCRIPT"
+# We still need the pixi run wrapper so docker-cli (installed via pixi) is on PATH.
+TOOL_RUN="pixi run -m $(dirname "$TOOL_SCRIPT")/pixi.toml $TOOL_SCRIPT"
 $TOOL_RUN
 
 if ! docker image inspect "$IMAGE_TAG" > /dev/null 2>&1; then

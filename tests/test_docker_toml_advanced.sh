@@ -23,7 +23,7 @@ verbose = "True"
 quiet = "False"
 EOF
 
-export PIXI_CMD="$TOOL_SCRIPT -p $REPO_DIR"
+export PIXI_CMD="pixi run -m $(dirname "$TOOL_SCRIPT")/pixi.toml $TOOL_SCRIPT -p $REPO_DIR"
 
 echo "Building container..."
 set +e
@@ -55,8 +55,8 @@ if ! grep -qE "Starting Docker build\.\.\." output.log; then
 fi
 
 echo "Verifying seamless mode in Dockerfile..."
-if ! grep -q "pixi.*run.*as-is" "$EXPECTED_DOCKERFILE"; then
-    echo "Error: Seamless ENTRYPOINT not found in Dockerfile."
+if ! grep -q "pixi.*run.*--locked.*--as-is" "$EXPECTED_DOCKERFILE"; then
+    echo "Error: Seamless ENTRYPOINT missing '--locked' or '--as-is' in Dockerfile."
     cat "$EXPECTED_DOCKERFILE"
     exit 1
 fi

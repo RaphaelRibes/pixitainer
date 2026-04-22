@@ -39,10 +39,15 @@ if [[ ! "$CONTAINER_PYTHON" =~ "Python 3." ]]; then
     exit 1
 fi
 
-# Verify the ENTRYPOINT in image metadata points to pixi run
+# Verify the ENTRYPOINT in image metadata references pixi and includes --locked
 ENTRYPOINT=$(docker inspect --format '{{json .Config.Entrypoint}}' "$IMAGE_TAG")
 if ! echo "$ENTRYPOINT" | grep -q "pixi"; then
     echo "Error: ENTRYPOINT does not reference pixi. Got: $ENTRYPOINT"
+    exit 1
+fi
+
+if ! echo "$ENTRYPOINT" | grep -q "\-\-locked"; then
+    echo "Error: ENTRYPOINT is missing '--locked'. Got: $ENTRYPOINT"
     exit 1
 fi
 

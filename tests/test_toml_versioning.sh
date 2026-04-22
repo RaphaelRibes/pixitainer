@@ -38,7 +38,7 @@ if ! grep -q "pixi self-update --version 0.64.0" toml_pversion.def; then
 fi
 
 echo "Testing 'latest' option..."
-rm -rf toml_pversion.sif toml_pversion.def
+rm -f toml_pversion.sif toml_pversion.def
 # Restore backup and append new test config
 mv pixi.toml.bak pixi.toml
 cat << 'EOF' >> pixi.toml
@@ -50,6 +50,11 @@ latest = "True"
 EOF
 
 $PIXI_CMD
+
+if [ ! -f "toml_pversion.def" ]; then
+    echo "Error: toml_pversion.def not found for latest build."
+    exit 1
+fi
 
 if grep -q "pixi self-update" toml_pversion.def; then
     echo "Error: latest=true should not specify self-update in def file."
