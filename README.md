@@ -51,7 +51,7 @@ pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/con
 pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer-singularity
 
 # For Docker
-pixi global install -c [https://prefix.dev/raphaelribes](https://prefix.dev/raphaelribes) -c [https://prefix.dev/conda-forge](https://prefix.dev/conda-forge) pixitainer-docker
+pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer-docker
 ```
 
 ### Developer
