@@ -275,6 +275,14 @@ To fix it, replace your `mkdir test` byt `mkdir $INIT_CWD/test`.
 
 However, sometimes pixi may write something in its cache so don't hesitate to use `--writable-tmpfs`.
 
+### Failed to create mount namespace
+
+On debian based distro like Ubuntu, you will get this error message. My solution was to add an alias to my `.bashrc` defined like so:
+```sh
+alias fixnamespace="sudo sysctl -w kernel.unprivileged_userns_clone=1 && sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0"
+```
+Running `fixnamespace` will fix your namespace! However you will have to type it again every time you start your computer.
+
 ## How ?
 
 The best thing to do will be to add this way as a [pixi extension](https://pixi.sh/latest/integration/extensions/introduction/), so we just have to type `pixi containerize`, some option and tada !
