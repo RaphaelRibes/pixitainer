@@ -73,10 +73,14 @@ pixi build
 
 ```bash
 # Apptainer
-pixi global install pixitainer --path pixitainer-0.6.1*.conda --channel conda-forge
+pixi global install pixitainer --path pixitainer-0.7.0*.conda --channel conda-forge
 
 # Singularity
-pixi global install pixitainer-singularity --path pixitainer-singularity-0.6.1*.conda --channel conda-forge
+pixi global install pixitainer-singularity --path pixitainer-singularity-0.7.0*.conda --channel conda-forge
+
+
+# Docker
+pixi global install pixitainer-singularity --path pixitainer-docker-0.7.0*.conda --channel conda-forge
 ```
 
 ## How to use
