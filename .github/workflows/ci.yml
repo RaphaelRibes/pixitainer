@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: "."
+          severity: style
+          additional_files: |
+            pixi-containerize
+            pixi-containerize-docker
+            pixi-containerize-singularity
+            lib/common.sh
+            lib/sif.sh
+            lib/bootstrap.sh
+          ignore_paths: |
+            tests
+            images
+
+  sif-tests:
+    name: SIF — ${{ matrix.tool }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        tool: [apptainer, singularity]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.9.5
+        with:
+          pixi-version: v0.67.2
+          cache: true
+      - name: Install container runtimes via tests/pixi.toml
+        working-directory: tests
+        run: pixi install
+      - name: Enable unprivileged user namespaces (for --fakeroot)
+        run: |
+          sudo sysctl -w kernel.unprivileged_userns_clone=1 2>/dev/null || true
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 2>/dev/null || true
+      - name: Run ${{ matrix.tool }} test suite
+        env:
+          TOOL_SCRIPT: ${{ github.workspace }}/pixi-containerize${{ matrix.tool == 'singularity' && '-singularity' || '' }}
+          CONTAINER_CMD: pixi run --manifest-path ${{ github.workspace }}/tests/pixi.toml ${{ matrix.tool }}
+          PIXI_CMD_TEMPLATE: ${{ github.workspace }}/pixi-containerize${{ matrix.tool == 'singularity' && '-singularity' || '' }} -p
+        run: |
+          chmod +x pixi-containerize pixi-containerize-singularity
+          cd tests && bash run_all.sh --tool ${{ matrix.tool }} --batch-size 2
+
+  docker-tests:
+    name: Docker test suite
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.9.5
+        with:
+          pixi-version: v0.67.2
+          cache: true
+      - name: Run full Docker test suite
+        env:
+          TOOL_SCRIPT: ${{ github.workspace }}/pixi-containerize-docker
+          CONTAINER_CMD: docker
+          PIXI_CMD_TEMPLATE: ${{ github.workspace }}/pixi-containerize-docker -p
+        run: |
+          chmod +x pixi-containerize-docker
+          cd tests && bash run_all_docker.sh --batch-size 2
