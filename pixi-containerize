@@ -12,7 +12,7 @@ fi
 source "$_PIXITAINER_LIB/common.sh"
 source "$_PIXITAINER_LIB/sif.sh"
 
-BOOTSTRAP_SH="$_PIXITAINER_LIB/bootstrap.sh"
+export BOOTSTRAP_SH="$_PIXITAINER_LIB/bootstrap.sh"
 
 # --- Help ---
 usage() {

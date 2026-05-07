@@ -11,7 +11,7 @@ else
 fi
 source "$_PIXITAINER_LIB/common.sh"
 
-BOOTSTRAP_SH="$_PIXITAINER_LIB/bootstrap.sh"
+export BOOTSTRAP_SH="$_PIXITAINER_LIB/bootstrap.sh"
 
 # --- Backend identity ---
 BACKEND="docker"
