@@ -23,12 +23,20 @@ fi
 # --- Configuration ---
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 
-if [[ "$TOOL" == "singularity" ]]; then
-    TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize-singularity"
-    CONTAINER_CMD="pixi run singularity"
-else
-    TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize"
-    CONTAINER_CMD="pixi run apptainer"
+# Use env var overrides if set (allows CI to call scripts directly)
+if [ -z "$TOOL_SCRIPT" ]; then
+    if [[ "$TOOL" == "singularity" ]]; then
+        TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize-singularity"
+    else
+        TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize"
+    fi
+fi
+if [ -z "$CONTAINER_CMD" ]; then
+    if [[ "$TOOL" == "singularity" ]]; then
+        CONTAINER_CMD="pixi run singularity"
+    else
+        CONTAINER_CMD="pixi run apptainer"
+    fi
 fi
 
 # Base directory for individual test workspaces
@@ -91,8 +99,11 @@ mkdir -p "$SHARED_REPO_DIR"
 chmod +x "$TOOL_SCRIPT"
 
 # Define the PIXI_CMD with the -p argument pointing to the test repo copy.
-# Will be evaluated inside run_test_isolated
-export PIXI_CMD_TEMPLATE="pixi run -m $(dirname "$TOOL_SCRIPT")/pixi.toml $TOOL_SCRIPT -p"
+# Will be evaluated inside run_test_isolated.
+# Can be overridden via env var (e.g. in CI, call scripts directly).
+if [ -z "$PIXI_CMD_TEMPLATE" ]; then
+    export PIXI_CMD_TEMPLATE="pixi run -m $(dirname "$TOOL_SCRIPT")/pixi.toml $TOOL_SCRIPT -p"
+fi
 
 # PIDs array to keep track of background processes
 pids=()

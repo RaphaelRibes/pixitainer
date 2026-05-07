@@ -16,13 +16,20 @@ done
 
 # --- Configuration ---
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd -P)"
-TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize-docker"
+
+# Allow env var override from CI
+if [ -z "$TOOL_SCRIPT" ]; then
+    TOOL_SCRIPT="$(cd "$(dirname "$0")/.." && pwd -P)/pixi-containerize-docker"
+fi
+export TOOL_SCRIPT
+
+if [ -z "$CONTAINER_CMD" ]; then
+    CONTAINER_CMD="pixi run docker"
+fi
+export CONTAINER_CMD
 
 BASE_WORK_DIR="${TESTS_DIR}/test_workspaces_docker"
 SHARED_REPO_DIR="${TESTS_DIR}/TestRepoDocker"
-
-export TOOL_SCRIPT
-export CONTAINER_CMD="pixi run docker"
 
 # --- Colors ---
 GREEN='\033[0;32m'
@@ -70,7 +77,10 @@ chmod +x "$TOOL_SCRIPT"
 # Wrapping with "pixi run -m <parent>/pixi.toml" causes pixi to pick up the
 # workspace build manifest and trigger a full conda package build instead of
 # simply executing the shell script.
-export PIXI_CMD_TEMPLATE="pixi run -m $(dirname "$TOOL_SCRIPT")/pixi.toml $TOOL_SCRIPT -p"
+# Can be overridden via env var (e.g. in CI, call scripts directly).
+if [ -z "$PIXI_CMD_TEMPLATE" ]; then
+    export PIXI_CMD_TEMPLATE="pixi run -m $(dirname "$TOOL_SCRIPT")/pixi.toml $TOOL_SCRIPT -p"
+fi
 
 # --- Test runner ---
 run_test_isolated() {

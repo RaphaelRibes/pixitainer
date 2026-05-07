@@ -5,8 +5,8 @@ cd "$REPO_DIR"
 IMAGE_NAME="keep_def_test.sif"
 DEF_FILE="keep_def_test.def"
 
-# Cleanup potential leftovers
-rm -rf .tmp_pixitainer
+# Cleanup potential leftovers — temp dir is now backend-specific
+rm -rf .tmp_pixitainer_apptainer .tmp_pixitainer_singularity
 rm -f "$IMAGE_NAME"
 
 echo "Testing --keep-def option..."

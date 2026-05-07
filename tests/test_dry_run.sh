@@ -4,8 +4,8 @@ set -e
 cd "$REPO_DIR"
 IMAGE_NAME="dry_run_test.sif"
 
-# Cleanup potential leftovers
-rm -rf .tmp_pixitainer
+# Cleanup potential leftovers — temp dir is now backend-specific
+rm -rf .tmp_pixitainer_apptainer .tmp_pixitainer_singularity
 rm -f "$IMAGE_NAME"
 
 echo "Testing --dry-run option..."
@@ -43,8 +43,8 @@ fi
 
 echo "Success: Definition file content correctly output to stdout"
 
-# The tmp directory should have been cleaned up
-if [ -d ".tmp_pixitainer" ]; then
+# The tmp directory should have been cleaned up (check both backend variants)
+if [ -d ".tmp_pixitainer_apptainer" ] || [ -d ".tmp_pixitainer_singularity" ]; then
     echo "Error: Temporary directory was not cleaned up"
     exit 1
 fi
