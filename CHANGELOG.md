@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.1] - 2026-05-05
+
+### 🐛 Bug Fixes
+
+- Fixed `build_install_cmd` dropping `$extra_flags` when a single environment was specified
+- Fixed `resolve_pixi_version` running `pixi -V` unnecessarily when version was already provided
+- Fixed help text inconsistency: all backends now correctly say "(default: same as host)"
+- Fixed temp directory collision between Apptainer and Singularity builds (`_apptainer` / `_singularity` suffix)
+- Fixed temp file leak in `run_with_spinner` by adding cleanup trap
+- Fixed developer install command in README (pixitainer-docker was installing the wrong package)
+
+### 🧹 Maintenance
+
+- Updated tests for new temp directory naming
+- Added GitHub Actions CI workflow (ShellCheck, dry-run tests, TOML config validation)
+- README grammar and clarity improvements
+
 ## [0.7.0] - 2026-04-22
 
 ### 🚀 Features
