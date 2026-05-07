@@ -9,7 +9,7 @@ jobs:
     name: ShellCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@2.0.0
         with:
@@ -36,7 +36,7 @@ jobs:
       matrix:
         tool: [apptainer, singularity]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
       - uses: prefix-dev/setup-pixi@v0.9.5
         with:
           pixi-version: v0.67.2
@@ -64,7 +64,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
       - uses: prefix-dev/setup-pixi@v0.9.5
         with:
           pixi-version: v0.67.2
