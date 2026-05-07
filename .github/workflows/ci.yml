@@ -44,6 +44,8 @@ jobs:
       - name: Install container runtimes via tests/pixi.toml
         working-directory: tests
         run: pixi install
+      - name: Add pixi test env to PATH
+        run: echo "${{ github.workspace }}/tests/.pixi/envs/default/bin" >> $GITHUB_PATH
       - name: Enable unprivileged user namespaces (for --fakeroot)
         run: |
           sudo sysctl -w kernel.unprivileged_userns_clone=1 2>/dev/null || true
