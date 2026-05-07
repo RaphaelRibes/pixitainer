@@ -35,7 +35,7 @@ usage() {
     echo ""
 
     echo "Pixi Versioning:"
-    echo "  -V, --pixi-version VER    Specify pixi version (default: latest)"
+    echo "  -V, --pixi-version VER    Specify pixi version (default: same as host)"
     echo "  -L, --latest              Force the use of the latest pixi version (cannot be used with -V)"
     echo ""
 
