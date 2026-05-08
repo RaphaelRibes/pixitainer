@@ -3,7 +3,7 @@
 # Sourced by pixi-containerize, pixi-containerize-singularity, pixi-containerize-docker.
 # shellcheck disable=SC2034  # Variables are used by the sourcing scripts.
 
-PIXITAINER_VERSION="0.7.0"
+PIXITAINER_VERSION="0.7.1"
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -346,7 +346,7 @@ build_install_cmd() {
     elif [ ${#ENVS[@]} -eq 1 ]; then
         local env="${ENVS[0]}"
         log "ℹ️ Adding environment: $env"
-        INSTALL_CMD="pixi install -e $env --frozen"
+        INSTALL_CMD="pixi install $extra_flags -e $env --frozen"
     elif [ ${#ENVS[@]} -gt 1 ]; then
         log "ℹ️ Adding environments:"
         local env_flags=""
@@ -373,8 +373,7 @@ build_install_cmd() {
 #                       self-updates). Empty when nothing to do.
 # ---------------------------------------------------------------------------
 resolve_pixi_version() {
-    local host_ver
-    host_ver=$(pixi -V | awk '{print $NF}')
+    local host_ver=""
 
     if [ -n "$TARGET_PIXI_VERSION" ]; then
         PIXI_VERSION="$TARGET_PIXI_VERSION"
@@ -382,6 +381,7 @@ resolve_pixi_version() {
         PIXI_VERSION=$(curl -s https://api.github.com/repos/prefix-dev/pixi/releases/latest \
             | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/')
     else
+        host_ver=$(pixi -V | awk '{print $NF}')
         PIXI_VERSION="$host_ver"
     fi
 
@@ -450,6 +450,10 @@ run_with_spinner() {
 
     LOG_FILE="$(mktemp)"
     STEP_FILE="$(mktemp)"
+
+    # Ensure temp files are cleaned up even on early exit / interrupt
+    _spinner_cleanup() { rm -f "$LOG_FILE" "$STEP_FILE"; }
+    trap _spinner_cleanup EXIT TERM INT
 
     CURRENT_STEP="$initial_step"
     echo "$CURRENT_STEP" > "$STEP_FILE"

@@ -18,7 +18,7 @@ resolve_sif_paths() {
         OUTPUT_ABS="$(cd "$output_dir" && pwd -P)/$(basename "$OUTPUT")"
         OUTPUT_PARENT="$(cd "$output_dir" && pwd -P)"
     fi
-    TMP_DIR="$OUTPUT_PARENT/.tmp_pixitainer"
+    TMP_DIR="$OUTPUT_PARENT/.tmp_pixitainer_${BACKEND}"
 }
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@ jobs:
     name: ShellCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@2.0.0
         with:
@@ -36,7 +36,7 @@ jobs:
       matrix:
         tool: [apptainer, singularity]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
       - uses: prefix-dev/setup-pixi@v0.9.5
         with:
           pixi-version: v0.67.2
@@ -44,6 +44,8 @@ jobs:
       - name: Install container runtimes via tests/pixi.toml
         working-directory: tests
         run: pixi install
+      - name: Add pixi test env to PATH
+        run: echo "${{ github.workspace }}/tests/.pixi/envs/default/bin" >> $GITHUB_PATH
       - name: Enable unprivileged user namespaces (for --fakeroot)
         run: |
           sudo sysctl -w kernel.unprivileged_userns_clone=1 2>/dev/null || true
@@ -56,6 +58,12 @@ jobs:
         run: |
           chmod +x pixi-containerize pixi-containerize-singularity
           cd tests && bash run_all.sh --tool ${{ matrix.tool }} --batch-size 2
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.tool }}
+          path: tests/test_workspaces/**/test.log
 
   docker-tests:
     name: Docker test suite
@@ -64,7 +72,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
       - uses: prefix-dev/setup-pixi@v0.9.5
         with:
           pixi-version: v0.67.2
@@ -77,3 +85,9 @@ jobs:
         run: |
           chmod +x pixi-containerize-docker
           cd tests && bash run_all_docker.sh --batch-size 2
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-docker
+          path: tests/test_workspaces/**/test.log
