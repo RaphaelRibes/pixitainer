@@ -9,8 +9,10 @@ if [ -n "$CONDA_PREFIX" ] && [ -d "$CONDA_PREFIX/opt/pixitainer" ]; then
 else
     _PIXITAINER_LIB="$(cd "$(dirname "$0")" && pwd -P)/lib"
 fi
+# shellcheck disable=SC1091
 source "$_PIXITAINER_LIB/common.sh"
 
+# shellcheck disable=SC2034  # Used by common.sh build_sif_files_section path resolution
 BOOTSTRAP_SH="$_PIXITAINER_LIB/bootstrap.sh"
 
 # --- Backend identity ---

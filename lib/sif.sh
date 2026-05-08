@@ -206,7 +206,8 @@ sif_dry_run_check() {
 
 sif_final_cleanup() {
     if [ "$KEEP_DEF" = true ]; then
-        local final_def="$OUTPUT_PARENT/$(basename "${OUTPUT%.*}").def"
+        local final_def
+        final_def="$OUTPUT_PARENT/$(basename "${OUTPUT%.*}").def"
         mv "$TARGET_DEF" "$final_def"
         log "ℹ️ Definition file kept at: $final_def"
     fi

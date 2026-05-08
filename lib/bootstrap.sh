@@ -23,21 +23,27 @@ bootstrap_install() {
     PKGMGR=""
     if [ -n "$MISSING_PKGS" ]; then
         if command -v apt-get >/dev/null 2>&1; then
+            # shellcheck disable=SC2086 # word splitting intentional for package list
             apt-get update && apt-get install -y --no-install-recommends $MISSING_PKGS
             PKGMGR="apt"
         elif command -v pacman >/dev/null 2>&1; then
+            # shellcheck disable=SC2086
             pacman -Sy --noconfirm $MISSING_PKGS
             PKGMGR="pacman"
         elif command -v dnf >/dev/null 2>&1; then
+            # shellcheck disable=SC2086
             dnf install -y $MISSING_PKGS
             PKGMGR="dnf"
         elif command -v yum >/dev/null 2>&1; then
+            # shellcheck disable=SC2086
             yum install -y $MISSING_PKGS
             PKGMGR="yum"
         elif command -v apk >/dev/null 2>&1; then
+            # shellcheck disable=SC2086
             apk add --no-cache $MISSING_PKGS
             PKGMGR="apk"
         elif command -v zypper >/dev/null 2>&1; then
+            # shellcheck disable=SC2086
             zypper in -y $MISSING_PKGS
             PKGMGR="zypper"
         else

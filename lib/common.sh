@@ -452,6 +452,7 @@ run_with_spinner() {
     STEP_FILE="$(mktemp)"
 
     # Ensure temp files are cleaned up even on early exit / interrupt
+    # shellcheck disable=SC2329  # Called indirectly via trap
     _spinner_cleanup() { rm -f "$LOG_FILE" "$STEP_FILE"; }
     trap _spinner_cleanup EXIT TERM INT
 
