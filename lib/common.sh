@@ -3,7 +3,7 @@
 # Sourced by pixi-containerize, pixi-containerize-singularity, pixi-containerize-docker.
 # shellcheck disable=SC2034  # Variables are used by the sourcing scripts.
 
-PIXITAINER_VERSION="0.7.1"
+PIXITAINER_VERSION="0.7.2"
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -25,18 +25,18 @@ detect_base_image() {
 
         if [[ "$ID" == "ubuntu" || "$ID" == "debian" || "$ID" == "fedora" || "$ID" == "alpine" || "$ID" == "rockylinux" || "$ID" == "almalinux" ]]; then
             if [ -z "$VERSION_ID" ]; then
-                BASE_IMAGE="${ID}:latest"
+                BASE_IMAGE="${ID}"
             else
                 BASE_IMAGE="${ID}:${VERSION_ID}"
             fi
         elif [[ "$ID" == "arch" || "$ID" == "archlinux" || "$ID_LIKE" == *"arch"* ]]; then
-            BASE_IMAGE="archlinux:latest"
+            BASE_IMAGE="archlinux"
         elif [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
             BASE_IMAGE="ubuntu:24.04"
         elif [[ "$ID_LIKE" == *"fedora"* || "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
-            BASE_IMAGE="fedora:latest"
+            BASE_IMAGE="fedora"
         elif [[ "$ID_LIKE" == *"suse"* ]]; then
-            BASE_IMAGE="opensuse/tumbleweed:latest"
+            BASE_IMAGE="opensuse/tumbleweed"
         else
             echo "⚠️  Warning: Unsupported OS '$ID'. Defaulting to ubuntu:24.04 as base image."
             BASE_IMAGE="ubuntu:24.04"
@@ -45,7 +45,6 @@ detect_base_image() {
         echo "⚠️  Warning: /etc/os-release not found. Defaulting to ubuntu:24.04 as base image."
         BASE_IMAGE="ubuntu:24.04"
     fi
-    log "ℹ️ Base image: $BASE_IMAGE"
 }
 
 # ---------------------------------------------------------------------------

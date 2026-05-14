@@ -251,6 +251,7 @@ sif_main() {
     resolve_manifest
     resolve_sif_paths
 
+    log "ℹ️ Base image: $BASE_IMAGE"
     log "📦 Containerizing project from: $WD"
     log "📂 Output target: $OUTPUT_ABS"
 
