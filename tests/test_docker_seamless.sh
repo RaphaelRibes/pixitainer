@@ -19,8 +19,9 @@ if [ $EXIT_CODE -ne 0 ]; then
     exit $EXIT_CODE
 fi
 
-if ! grep -q "Seamless mode enabled" "$OUTPUT_LOG"; then
-    echo "Error: 'Seamless mode enabled' not found in output."
+# In v0.8.0, --seamless is deprecated and prints a warning
+if ! grep -q "seamless.*deprecated" "$OUTPUT_LOG"; then
+    echo "Error: 'seamless is deprecated' warning not found in output."
     cat "$OUTPUT_LOG"
     exit 1
 fi
