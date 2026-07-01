@@ -211,19 +211,19 @@ docker run --rm fastp:latest fastp --version
 
 ### `tool` options
 
-| Option | Meaning |
-| --- | --- |
-| `-c, --channel CHAN` | Channel to pull from (repeatable, default `conda-forge`). When you set a channel, `conda-forge` is auto-appended if missing, since most packages need it. |
-| `-o, --output` | Output `.sif` path / Docker tag. Defaults to the package name. |
-| `-m, --manual` | Use a shell entrypoint instead of the tool binary. By default the package's binary is the image entrypoint, so you run the tool directly. |
-| `-b, --base-image` | Base image (default: `debian:stable-slim`, a small glibc base). |
-| `-V, --pixi-version` / `-L, --latest` | Pixi version selection (same as project mode). |
-| `-a, --add-file SRC:DEST` | Add an extra file/folder to the image (repeatable). |
-| `--post-command CMD` | Run an extra command after install (repeatable). |
-| `-l, --label KEY:VALUE` | Add a custom label (repeatable). |
-| `-k, --keep-def` | Keep the generated `.def` / `Dockerfile`. |
-| `-d, --dry-run` | Print the `.def` / `Dockerfile` without building. |
-| `-q, --quiet` / `-v, --verbose` | Output verbosity. |
+| Option                                | Meaning                                                                                                                                                   |
+|---------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-c, --channel CHAN`                  | Channel to pull from (repeatable, default `conda-forge`). When you set a channel, `conda-forge` is auto-appended if missing, since most packages need it. |
+| `-o, --output`                        | Output `.sif` path / Docker tag. Defaults to the package name.                                                                                            |
+| `-m, --manual`                        | Use a shell entrypoint instead of the tool binary. By default the package's binary is the image entrypoint, so you run the tool directly.                 |
+| `-b, --base-image`                    | Base image (default: `debian:stable-slim`, a small glibc base).                                                                                           |
+| `-V, --pixi-version` / `-L, --latest` | Pixi version selection (same as project mode).                                                                                                            |
+| `-a, --add-file SRC:DEST`             | Add an extra file/folder to the image (repeatable).                                                                                                       |
+| `--post-command CMD`                  | Run an extra command after install (repeatable).                                                                                                          |
+| `-l, --label KEY:VALUE`               | Add a custom label (repeatable).                                                                                                                          |
+| `-k, --keep-def`                      | Keep the generated `.def` / `Dockerfile`.                                                                                                                 |
+| `-d, --dry-run`                       | Print the `.def` / `Dockerfile` without building.                                                                                                         |
+| `-q, --quiet` / `-v, --verbose`       | Output verbosity.                                                                                                                                         |
 
 Pin a version with the MatchSpec syntax (`fastp=0.23.4`, `'python>=3.11'`) rather than a dedicated flag.
 
@@ -417,7 +417,7 @@ TODO:
     - [x] Run container as user (`--user`)
     - [x] Override container working directory (`--workdir`)
   - [x] Support to containerize a specific tool, without need a pixi manifest
-    - [x] e.g `pixi containerize tool -c/--channel <channel> <tool_name>` (version pinned via MatchSpec, e.g. `tool fastp=0.23.4`; images are auto-slimmed)
+    - [x] e.g `pixi containerize tool -c/--channel <channel> <tool_name>` (version pinned via MatchSpec, e.g. `tool fastp=0.23.4`)
 - [x] Support the options in a `[tool.pixitainer]` table in the manifest
   - [x] Support backend-specific subtables (`[tool.pixitainer.<backend>]`)
 - [x] Support of container solutions
