@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0] - 2026-07-01
+
+### 🚀 Features
+
+- Added the `tool` subcommand to containerize one or more conda packages directly with `pixi global install`, without needing a `pixi.toml` / `pixi.lock`. It can be run from anywhere, supports inline version pinning via conda MatchSpec (e.g. `tool fastp=0.23.4`), and can install several packages into a single image.
+- `tool` images are auto-slimmed: the pixi download cache and the build-time pixi binary are removed (for Docker, install and cleanup happen in a single layer), and the default base is the small `debian:stable-slim`.
+- Seamless execution is now the default for all backends (`pixi containerize`, `-singularity`, `-docker`). Use `-m` / `--manual` (or `manual = true` in the `[tool.pixitainer]` TOML table) to get a raw shell entrypoint instead.
+
+### ⚠️ Deprecations
+
+- `-s` / `--seamless` and the `seamless` TOML key are deprecated since 0.8.0, as seamless is now the default. They still work but print a deprecation notice; use `--manual` / `manual` to opt out.
+
 ## [0.7.1] - 2026-05-05
 
 ### 🐛 Bug Fixes

@@ -46,8 +46,6 @@ print_tool_usage() {
     else
         echo "  -o, --output OUTPUT       Output image path (default: <package>.sif)"
     fi
-    echo "  -m, --manual              Use a shell entrypoint instead of the tool binary"
-    echo "                            (by default the package's binary is the entrypoint)"
     echo ""
 
     echo "Environment & Image Setup:"
@@ -97,14 +95,13 @@ TOOL_DEFAULT_BASE="debian:stable-slim"
 
 # ---------------------------------------------------------------------------
 # Initialise tool-mode default variables. Call after init_common_defaults.
-# Sets: TOOL_PKGS, CHANNELS, CHANNEL_FLAGS, BASE_IMAGE, SEAMLESS
+# Sets: TOOL_PKGS, CHANNELS, CHANNEL_FLAGS, BASE_IMAGE
 # ---------------------------------------------------------------------------
 init_tool_defaults() {
     TOOL_PKGS=()
     CHANNELS=()
     CHANNEL_FLAGS=""
     BASE_IMAGE="$TOOL_DEFAULT_BASE"
-    SEAMLESS=true   # tool images run the tool by default; --manual opts out
 }
 
 # ---------------------------------------------------------------------------
@@ -119,7 +116,6 @@ parse_tool_args() {
             -c|--channel)       CHANNELS+=("$2");          shift 2 ;;
             -o|--output)        OUTPUT="$2";               shift 2 ;;
             -b|--base-image)    BASE_IMAGE="$2";           shift 2 ;;
-            -m|--manual)        SEAMLESS=false;            shift   ;;
             -V|--pixi-version)  TARGET_PIXI_VERSION="$2";  shift 2 ;;
             -L|--latest)        LATEST_PIXI=true;          shift   ;;
             -a|--add-file)      EXTRA_FILES+=("$2");       shift 2 ;;
@@ -254,56 +250,49 @@ tool_slim_steps() {
 }
 
 # ---------------------------------------------------------------------------
-# Seamless (tool binary as entrypoint) is the default, but it only has a
-# well-defined target for a single package. When several packages are
-# requested, fall back to a manual (shell) entrypoint so every tool stays
-# reachable by name. A user-supplied --manual is already SEAMLESS=false here.
+# Emit the *developed* body of a bootstrap.sh function as literal %post lines,
+# so the generated .def is self-contained (no sourced /opt/bootstrap.sh).
+# The `return` short-circuit in bootstrap_cleanup is dropped: it is only an
+# early-exit optimisation, and the remaining commands are no-ops when there is
+# nothing to clean, so removing it keeps the body valid at %post top level.
+# $1 = function name (bootstrap_install | bootstrap_cleanup)
+# Reads: BOOTSTRAP_SH
 # ---------------------------------------------------------------------------
-tool_resolve_seamless() {
-    if [ "$SEAMLESS" = true ] && [ ${#TOOL_PKGS[@]} -gt 1 ]; then
-        SEAMLESS=false
-        log "ℹ️ Multiple packages: using a manual entrypoint (run a tool by name)"
-    fi
+emit_bootstrap_body() {
+    awk -v f="$1" '
+        $0 ~ "^" f "\\(\\) \\{" { inbody = 1; next }
+        inbody && /^\}/          { inbody = 0; next }
+        inbody                   { print }
+    ' "$BOOTSTRAP_SH" | grep -vE '(^|[[:space:]])return([[:space:]]|$)'
 }
 
 # ---------------------------------------------------------------------------
-# Build the SIF runscript for tool mode.
-# Sets: RUNSCRIPT_CONTENT
-# ---------------------------------------------------------------------------
-build_tool_runscript_sif() {
-    if [ "$SEAMLESS" = true ]; then
-        local bin
-        bin="$(tool_clean_name "${TOOL_PKGS[0]}")"
-        log "ℹ️ Entrypoint: '$bin' (use --manual for a shell entrypoint)"
-        RUNSCRIPT_CONTENT="exec $bin \"\$@\""
-    else
-        RUNSCRIPT_CONTENT='exec "$@"'
-    fi
-}
-
-# ---------------------------------------------------------------------------
-# Build the %files section for a tool .def (bootstrap + extra files only:
-# no manifest, no lock file).
-# Sets: FILES_SECTION
-# Requires: BOOTSTRAP_SH
+# Build the %files section for a tool .def (extra files only: no manifest, no
+# lock file, and no bootstrap.sh — its commands are inlined into %post now).
+# Sets: FILES_SECTION (empty when there are no extra files).
 # ---------------------------------------------------------------------------
 build_tool_files_section() {
-    FILES_SECTION="    \"$BOOTSTRAP_SH\" /opt/bootstrap.sh"
+    FILES_SECTION=""
 
     local count=${#EXTRA_FILES[@]}
     [ "$count" -eq 0 ] && return
     [ "$count" -gt 1 ] && log "ℹ️ Adding files:"
 
-    local file_spec src dest label
+    local file_spec src dest label line
     for file_spec in "${EXTRA_FILES[@]}"; do
         if [[ "$file_spec" == *":"* ]]; then
             src="${file_spec%%:*}"
             dest="${file_spec#*:}"
             label="$src -> $dest"
-            FILES_SECTION+=$'\n'"    \"$src\" \"$dest\""
+            line="    \"$src\" \"$dest\""
         else
             label="$file_spec"
-            FILES_SECTION+=$'\n'"    \"$file_spec\""
+            line="    \"$file_spec\""
+        fi
+        if [ -z "$FILES_SECTION" ]; then
+            FILES_SECTION="$line"
+        else
+            FILES_SECTION+=$'\n'"$line"
         fi
         if [ "$count" -eq 1 ]; then
             log "ℹ️ Adding file: $label"
@@ -323,6 +312,13 @@ generate_tool_def_file() {
     def_name="$(basename "${OUTPUT%.*}").def"
     TARGET_DEF="$TMP_DIR/$def_name"
 
+    # Only emit a %files section when there is something to copy. bootstrap.sh
+    # is no longer copied in — its commands are inlined into %post below.
+    local files_block=""
+    if [ -n "$FILES_SECTION" ]; then
+        files_block=$'\n\n'"%files"$'\n'"$FILES_SECTION"
+    fi
+
     cat <<EOF > "$TARGET_DEF"
 Bootstrap: docker
 From: $BASE_IMAGE
@@ -331,10 +327,7 @@ From: $BASE_IMAGE
     Created_With Pixitainer (https://github.com/RaphaelRibes/pixitainer)
     Pixitainer_Version $PIXITAINER_VERSION
     Pixi_Version $PIXI_VERSION
-    Pixitainer_Mode tool$CUSTOM_LABELS_SECTION
-
-%files
-$FILES_SECTION
+    Pixitainer_Mode tool$CUSTOM_LABELS_SECTION$files_block
 
 %environment
     export PIXI_HOME=/opt/pixi
@@ -342,11 +335,10 @@ $FILES_SECTION
     export PATH="/opt/pixi/bin:\$PATH"
 
 %post
-    . /opt/bootstrap.sh
     set -e
 
     echo "STEP: Installing system prerequisites and Pixi"
-    bootstrap_install
+$(emit_bootstrap_body bootstrap_install)
 
     $PIXI_VERSION_CMD
 
@@ -363,10 +355,7 @@ $FILES_SECTION
 $(tool_slim_steps | sed 's/^/    /')
 
     echo "STEP: Cleaning"
-    bootstrap_cleanup
-
-%runscript
-    $RUNSCRIPT_CONTENT
+$(emit_bootstrap_body bootstrap_cleanup)
 EOF
 }
 
@@ -396,17 +385,12 @@ generate_tool_dockerfile() {
 
     log_post_commands
 
+    # Tool binaries are installed globally on PATH; there is no seamless
+    # single-binary entrypoint. Run any installed tool by name:
+    #   docker run <image> <tool> [args...]
     local entrypoint_line cmd_line
-    if [ "$SEAMLESS" = true ]; then
-        local bin
-        bin="$(tool_clean_name "${TOOL_PKGS[0]}")"
-        log "ℹ️ Entrypoint: '$bin' (use --manual for a shell entrypoint)"
-        entrypoint_line="ENTRYPOINT [\"$bin\"]"
-        cmd_line='CMD []'
-    else
-        entrypoint_line='ENTRYPOINT ["/bin/bash", "-c", "exec \"$@\"", "--"]'
-        cmd_line='CMD ["/bin/bash"]'
-    fi
+    entrypoint_line='ENTRYPOINT ["/bin/bash", "-c", "exec \"$@\"", "--"]'
+    cmd_line='CMD ["/bin/bash"]'
 
     # Build ONE RUN that installs prerequisites + pixi, installs the tool(s),
     # runs post-commands, then slims and cleans up. Doing it all in a single
@@ -478,7 +462,6 @@ tool_main_sif() {
     parse_tool_args "$BACKEND" "$@"
     validate_common_args
     validate_tool_args "$BACKEND"
-    tool_resolve_seamless
 
     OUTPUT="${OUTPUT:-$(tool_default_output_sif)}"
 
@@ -489,7 +472,6 @@ tool_main_sif() {
 
     build_tool_files_section
     build_tool_install_cmd
-    build_tool_runscript_sif
     resolve_pixi_version
     log_labels
     format_sif_labels
@@ -521,7 +503,6 @@ tool_main_docker() {
     parse_tool_args "docker" "$@"
     validate_common_args
     validate_tool_args "docker"
-    tool_resolve_seamless
 
     OUTPUT="${OUTPUT:-$(tool_default_output_docker)}"
 

@@ -3,7 +3,7 @@
 # Sourced by pixi-containerize, pixi-containerize-singularity, pixi-containerize-docker.
 # shellcheck disable=SC2034  # Variables are used by the sourcing scripts.
 
-PIXITAINER_VERSION="0.7.2"
+PIXITAINER_VERSION="0.8.0"
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -56,7 +56,7 @@ detect_base_image() {
 # ---------------------------------------------------------------------------
 init_common_defaults() {
     PROJECT_PATH="."
-    SEAMLESS=false
+    SEAMLESS=true   # seamless is the default; --manual / manual=true opts out
     TARGET_PIXI_VERSION=""
     LATEST_PIXI=false
     KEEP_DEF=false
@@ -150,7 +150,10 @@ apply_toml_common() {
     case "$key" in
         output)       OUTPUT="$clean_val" ;;
         path)         PROJECT_PATH="$clean_val" ;;
-        seamless)     _toml_set_bool SEAMLESS    "$clean_val" ;;
+        manual)       if [[ "${clean_val,,}" == "true" ]]; then SEAMLESS=false; else SEAMLESS=true; fi ;;
+        seamless)     # Deprecated since 0.8.0: seamless is now the default. Kept as an alias.
+                      echo "⚠️  Warning: the 'seamless' config key is deprecated since 0.8.0; seamless is now the default. Use 'manual' instead." >&2
+                      _toml_set_bool SEAMLESS "$clean_val" ;;
         base-image)   BASE_IMAGE="$clean_val" ;;
         no-install)   _toml_set_bool NO_INSTALL  "$clean_val" ;;
         pixi-version) TARGET_PIXI_VERSION="$clean_val" ;;
@@ -276,7 +279,10 @@ parse_common_args() {
         case $1 in
             -o|--output)        OUTPUT="$2";             shift 2 ;;
             -p|--path)          PROJECT_PATH="$2";       shift 2 ;;
-            -s|--seamless)      SEAMLESS=true;           shift   ;;
+            -m|--manual)        SEAMLESS=false;          shift   ;;
+            -s|--seamless)      # Deprecated since 0.8.0: seamless is now the default.
+                                echo "⚠️  Warning: '-s'/'--seamless' is deprecated since 0.8.0; seamless is now the default. Use '--manual' for a shell entrypoint." >&2
+                                SEAMLESS=true;           shift   ;;
             -b|--base-image)    BASE_IMAGE="$2";         shift 2 ;;
             -e|--env)           ENVS+=("$2");            shift 2 ;;
             -n|--no-install)    NO_INSTALL=true;         shift   ;;

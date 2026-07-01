@@ -1,6 +1,6 @@
 context:
   name: pixitainer
-  version: 0.7.2
+  version: 0.8.0
 
 recipe:
   name: ${{ name }}
@@ -21,6 +21,7 @@ outputs:
         - cp lib/common.sh $PREFIX/opt/pixitainer/common.sh
         - cp lib/sif.sh $PREFIX/opt/pixitainer/sif.sh
         - cp lib/bootstrap.sh $PREFIX/opt/pixitainer/bootstrap.sh
+        - cp lib/tool.sh $PREFIX/opt/pixitainer/tool.sh
         - cp pixi-containerize $PREFIX/bin/pixi-containerize
         - chmod +x $PREFIX/bin/pixi-containerize
     requirements:
@@ -47,6 +48,7 @@ outputs:
         - cp lib/common.sh $PREFIX/opt/pixitainer/common.sh
         - cp lib/sif.sh $PREFIX/opt/pixitainer/sif.sh
         - cp lib/bootstrap.sh $PREFIX/opt/pixitainer/bootstrap.sh
+        - cp lib/tool.sh $PREFIX/opt/pixitainer/tool.sh
         - cp pixi-containerize-singularity $PREFIX/bin/pixi-containerize-singularity
         - chmod +x $PREFIX/bin/pixi-containerize-singularity
     requirements:
@@ -72,6 +74,7 @@ outputs:
         - mkdir -p $PREFIX/opt/pixitainer
         - cp lib/common.sh $PREFIX/opt/pixitainer/common.sh
         - cp lib/bootstrap.sh $PREFIX/opt/pixitainer/bootstrap.sh
+        - cp lib/tool.sh $PREFIX/opt/pixitainer/tool.sh
         - cp pixi-containerize-docker $PREFIX/bin/pixi-containerize-docker
         - chmod +x $PREFIX/bin/pixi-containerize-docker
     requirements:

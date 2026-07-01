@@ -13,13 +13,16 @@ fi
 source "$_PIXITAINER_LIB/common.sh"
 # shellcheck disable=SC1091
 source "$_PIXITAINER_LIB/sif.sh"
+# shellcheck disable=SC1091
+source "$_PIXITAINER_LIB/tool.sh"
 
-# shellcheck disable=SC2034  # Accessed indirectly by sif.sh
+# shellcheck disable=SC2034  # Accessed indirectly by sif.sh / tool.sh
 BOOTSTRAP_SH="$_PIXITAINER_LIB/bootstrap.sh"
 
 # --- Help ---
 usage() {
     echo "Usage: pixi containerize-singularity [options]"
+    echo "       pixi containerize-singularity tool [options] PACKAGE [PACKAGE...]"
     echo ""
     echo "Pixi extension to containerize a project with Singularity."
     echo "Version: $PIXITAINER_VERSION"
@@ -28,7 +31,7 @@ usage() {
     echo "Core Options:"
     echo "  -o, --output OUTPUT       Output image path (default: pixitainer.sif)"
     echo "  -p, --path PATH           Working directory (source project)"
-    echo "  -s, --seamless            Enable seamless execution"
+    echo "  -m, --manual              Use a manual shell entrypoint (default is seamless 'pixi run')"
     echo ""
 
     echo "Environment & Image Setup:"
@@ -57,6 +60,13 @@ usage() {
     echo "  -q, --quiet               Quiet mode (suppress all output, return 0 on success, 1 on error)"
     echo "  -v, --verbose             Verbose mode (show full Singularity build output)"
     echo "  -h, --help                Show this help message"
+    echo ""
+    echo "Run 'pixi containerize-singularity tool -h' for help on the 'tool' subcommand."
 }
 
-sif_main singularity "$@"
+if [ "${1:-}" = "tool" ]; then
+    shift
+    tool_main_sif singularity "$@"
+else
+    sif_main singularity "$@"
+fi

@@ -11,6 +11,8 @@ else
 fi
 # shellcheck disable=SC1091
 source "$_PIXITAINER_LIB/common.sh"
+# shellcheck disable=SC1091
+source "$_PIXITAINER_LIB/tool.sh"
 
 # shellcheck disable=SC2034  # Used by common.sh build_sif_files_section path resolution
 BOOTSTRAP_SH="$_PIXITAINER_LIB/bootstrap.sh"
@@ -33,6 +35,7 @@ declare -a BUILD_ARGS=() SECRETS=() SSH_AGENTS=() EXTRA_TAGS=() CACHE_FROM=() CA
 # --- Help ---
 usage() {
     echo "Usage: pixi containerize-docker [options]"
+    echo "       pixi containerize-docker tool [options] PACKAGE [PACKAGE...]"
     echo ""
     echo "Pixi extension to containerize a project with Docker."
     echo "Version: $PIXITAINER_VERSION"
@@ -41,7 +44,7 @@ usage() {
     echo "Core Options:"
     echo "  -o, --output TAG          Docker image tag (default: pixitainer:latest)"
     echo "  -p, --path PATH           Working directory (source project)"
-    echo "  -s, --seamless            Enable seamless execution"
+    echo "  -m, --manual              Use a manual shell entrypoint (default is seamless 'pixi run')"
     echo ""
 
     echo "Environment & Image Setup:"
@@ -92,6 +95,8 @@ usage() {
     echo "  -q, --quiet               Quiet mode (suppress all output, return 0 on success, 1 on error)"
     echo "  -v, --verbose             Verbose mode (show full Docker build output)"
     echo "  -h, --help                Show this help message"
+    echo ""
+    echo "Run 'pixi containerize-docker tool -h' for help on the 'tool' subcommand."
 }
 
 # ---------------------------------------------------------------------------
@@ -311,13 +316,13 @@ generate_dockerfile() {
         done
     fi
 
-    # --- Seamless mode ---
+    # --- Entrypoint mode ---
     local entrypoint_line cmd_line
     if [ "$SEAMLESS" = true ]; then
-        log "ℹ️ Seamless mode enabled"
         entrypoint_line='ENTRYPOINT ["pixi", "run", "--locked", "--as-is", "-m", "'"$MANIFEST_DEST"'"]'
         cmd_line='CMD []'
     else
+        log "ℹ️ Manual mode: shell entrypoint (call 'pixi run' yourself)"
         entrypoint_line='ENTRYPOINT ["/bin/bash", "-c", "exec \"$@\"", "--"]'
         cmd_line='CMD ["/bin/bash"]'
     fi
@@ -489,6 +494,13 @@ run_docker_build() {
 # ===========================================================================
 # Main flow
 # ===========================================================================
+
+# --- `tool` subcommand: containerize a single package, no manifest needed ---
+if [ "${1:-}" = "tool" ]; then
+    shift
+    tool_main_docker "$@"
+    exit 0
+fi
 
 # --- Initialisation ---
 init_common_defaults
