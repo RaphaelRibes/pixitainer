@@ -132,6 +132,7 @@ TESTS_TO_RUN=(
     "test_docker_dry_run.sh"
     "test_docker_post_cmd.sh"
     "test_docker_add_file.sh"
+    "test_docker_tool_mode.sh"
     "test_docker_pyproject.sh"
     "test_docker_toml_options.sh"
     "test_docker_toml_advanced.sh"

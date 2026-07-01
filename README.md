@@ -1,6 +1,6 @@
 # Pixitainer
 
-![Version](https://img.shields.io/badge/Version-0.7.1-blue)
+![Version](https://img.shields.io/badge/Version-0.8.0-blue)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![License](https://img.shields.io/badge/Licence-BSD--3--Clause-green)](LICENSE)
 [![Forge](https://img.shields.io/badge/Forge-Prefix.dev--Forge-yellow)](https://prefix.dev/channels/raphaelribes/packages/pixitainer)
@@ -74,21 +74,21 @@ pixi build
 
 ```bash
 # Apptainer
-pixi global install pixitainer --path pixitainer-0.7.1*.conda --channel conda-forge
+pixi global install pixitainer --path pixitainer-0.8.0*.conda --channel conda-forge
 
 # Singularity
-pixi global install pixitainer-singularity --path pixitainer-singularity-0.7.1*.conda --channel conda-forge
+pixi global install pixitainer-singularity --path pixitainer-singularity-0.8.0*.conda --channel conda-forge
 
 # Docker
-pixi global install pixitainer-docker --path pixitainer-docker-0.7.1*.conda --channel conda-forge
+pixi global install pixitainer-docker --path pixitainer-docker-0.8.0*.conda --channel conda-forge
 ```
 
 ## How to use
 
 There are two ways of using pixitainer:
 
-1. Manually
-2. Seamlessly
+1. Seamlessly (default)
+2. Manually (`-m`, `--manual`)
 
 We put ourselves in an environment with one task defined like
 
@@ -97,7 +97,9 @@ We put ourselves in an environment with one task defined like
 make_dir = 'mkdir testdir'
 ```
 
-### Manually
+### Seamlessly (default)
+
+Seamless execution is the default, so no flag is needed.
 
 ```bash
 # For Apptainer
@@ -110,7 +112,43 @@ pixi containerize-singularity
 pixi containerize-docker
 ```
 
-Then you can use pixi in your image
+You can then run your task like pixi is not even here
+
+```bash
+# Apptainer
+apptainer run -f pixitainer.sif make_dir
+
+# Singularity
+singularity run -f pixitainer.sif make_dir
+
+# Docker
+docker run --rm <your_image_name>:latest make_dir
+```
+
+> **WARNING**: in seamless mode, every command run through the image is executed like so
+>
+> ```bash
+> pixi run --locked --as-is -m /opt/conf/pixi.toml "$@"
+> ```
+>
+> Meaning that you only have access to `pixi run`. Use `--manual` if you need a raw shell entrypoint.
+
+### Manually (`-m`, `--manual`)
+
+Pass `-m` / `--manual` to get a plain shell entrypoint instead, so you invoke `pixi` yourself.
+
+```bash
+# For Apptainer
+pixi containerize --manual
+
+# For Singularity
+pixi containerize-singularity --manual
+
+# For Docker
+pixi containerize-docker --manual
+```
+
+Then you call pixi inside your image
 
 ```bash
 # Apptainer
@@ -127,41 +165,82 @@ We add `--as-is` to make sure it sticks to the `pixi.lock` file, and it only use
 
 > **WARNING**: `-m /opt/conf/pixi.toml` is mandatory or pixi will use the default one in your current working directory.
 
-### Seamlessly
+## Containerizing a single tool (`tool`)
 
-Use the pixitainer extension command after installing it with the seamless option (`-s`, `--seamless`).
-
-```bash
-# For Apptainer
-pixi containerize -s
-
-# For Singularity
-pixi containerize-singularity -s
-
-# For Docker
-pixi containerize-docker -s
-```
-
-You can then turn your task like pixi is not even here
+Since **v0.8.0**, you can containerize one or more conda packages directly with `pixi global install`, **without needing a `pixi.toml` or `pixi.lock`**. The `tool` subcommand can be run from anywhere on your system.
 
 ```bash
 # Apptainer
-apptainer run -f pixitainer.sif make_dir
+pixi containerize tool python                 # -> python.sif
+pixi containerize tool -c bioconda fastp      # -> fastp.sif
 
 # Singularity
-singularity run -f pixitainer.sif make_dir
+pixi containerize-singularity tool -c bioconda samtools
 
 # Docker
-docker run --rm <your_image_name>:latest make_dir
+pixi containerize-docker tool -c bioconda fastp   # -> fastp:latest
 ```
 
-> **WARNING**: in seamless mode, every command run through the image is executed like so
->
-> ```bash
-> pixi run --as-is -m /opt/conf/pixi.toml "$@"
-> ```
->
-> Meaning that you only have access to `pixi run`.
+Packages use the conda MatchSpec syntax, so you can pin versions inline, like for pixi packages:
+
+```bash
+pixi containerize tool 'python>=3.11'
+```
+
+You can install several packages into one image (each gets its own global environment, all binaries exposed):
+
+```bash
+pixi containerize tool -c bioconda samtools bcftools
+```
+
+The image name defaults to the (first) package name (`<package>.sif` for SIF, `<package>:latest` for Docker). Override it with `-o/--output`:
+
+```bash
+pixi containerize tool -c bioconda fastp -o images/fastp-0.23.sif
+pixi containerize-docker tool -c bioconda fastp -o myregistry/fastp:0.23
+```
+
+Then run the tool from the image. By default the tool's binary is the entrypoint, so you run it directly:
+
+```bash
+apptainer run fastp.sif fastp --version
+docker run --rm fastp:latest fastp --version
+```
+
+> **Note**: with several packages (e.g. `tool samtools bcftools`) there is no single binary to bind, so the image falls back to the manual entrypoint automatically; run each tool by name.
+
+### `tool` options
+
+| Option                                | Meaning                                                                                                                                                   |
+|---------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-c, --channel CHAN`                  | Channel to pull from (repeatable, default `conda-forge`). When you set a channel, `conda-forge` is auto-appended if missing, since most packages need it. |
+| `-o, --output`                        | Output `.sif` path / Docker tag. Defaults to the package name.                                                                                            |
+| `-m, --manual`                        | Use a shell entrypoint instead of the tool binary. By default the package's binary is the image entrypoint, so you run the tool directly.                 |
+| `-b, --base-image`                    | Base image (default: `debian:stable-slim`, a small glibc base).                                                                                           |
+| `-V, --pixi-version` / `-L, --latest` | Pixi version selection (same as project mode).                                                                                                            |
+| `-a, --add-file SRC:DEST`             | Add an extra file/folder to the image (repeatable).                                                                                                       |
+| `--post-command CMD`                  | Run an extra command after install (repeatable).                                                                                                          |
+| `-l, --label KEY:VALUE`               | Add a custom label (repeatable).                                                                                                                          |
+| `-k, --keep-def`                      | Keep the generated `.def` / `Dockerfile`.                                                                                                                 |
+| `-d, --dry-run`                       | Print the `.def` / `Dockerfile` without building.                                                                                                         |
+| `-q, --quiet` / `-v, --verbose`       | Output verbosity.                                                                                                                                         |
+
+Pin a version with the MatchSpec syntax (`fastp=0.23.4`, `'python>=3.11'`) rather than a dedicated flag.
+
+### Keeping `tool` images small
+
+`tool` images are optimised for size automatically:
+
+- The default base is `debian:stable-slim` rather than a host-matched image. Since every package comes from conda, the base OS is irrelevant, so a small glibc base is used (override with `-b`).
+- The pixi download cache (`~/.cache/rattler`) is removed after install. In containers this cache is copied rather than hard-linked, so dropping it is a large saving.
+- The pixi binary itself is removed: it is only needed at build time. The exposed tool binaries are standalone trampolines under `/opt/pixi/bin`, so they keep working without it.
+- For Docker, install and cleanup happen in a single layer, so the cache, the pixi binary and the build-time `curl` never persist in a lower layer.
+
+If you need to trim further (for example stripping `man`/`include`/`*.a` from the env), add a `--post-command`, keeping in mind that compiler-like tools may need those files.
+
+> **WARNING**: inside `tool` mode, `-c` means `--channel` (not `--post-command`). Use the long form `--post-command` for post commands. This differs from the manifest-based commands, where `-c` is `--post-command`.
+
+> **Note**: `tool` mode does not read the `[tool.pixitainer]` TOML tables, since it is meant to run standalone without a project manifest.
 
 ## TOML Configuration
 
@@ -181,7 +260,7 @@ Keys placed here apply to **all backends** (Apptainer, Singularity, Docker) unle
 [tool.pixitainer]
 output = "my_image.sif"
 base-image = "ubuntu:24.04"
-seamless = true
+manual = false   # default; set true for a raw shell entrypoint
 env = ["default"]
 add-file = ["data/config.yaml:/opt/config.yaml"]
 post-command = ["echo 'Setup done' > /opt/setup.log"]
@@ -201,7 +280,7 @@ Keys placed in a backend-specific table **override** the matching key from `[too
 [tool.pixitainer]
 output = "my_image.sif"
 base-image = "ubuntu:24.04"
-seamless = true
+manual = false
 label = ["AUTHOR:me"]
 
 # When running `pixi containerize` (Apptainer):
@@ -304,7 +383,7 @@ TODO:
   - [x] Core Options
     - [x] Output image path (`-o`, `--output`)
     - [x] Working directory (`-p`, `--path`)
-    - [x] Enable seamless execution (`-s`, `--seamless`)
+    - [x] Manual (shell) entrypoint opt-out (`-m`, `--manual`); seamless is the default
   - [x] Environment & Image Setup
     - [x] Specify base image (`-b`, `--base-image`)
     - [x] Specific environment selection (`-e`, `--env`)
@@ -337,8 +416,8 @@ TODO:
     - [x] Export image to archive (`--save`)
     - [x] Run container as user (`--user`)
     - [x] Override container working directory (`--workdir`)
-  - [ ] Support to containerize a specific tool, without need a pixi manifest
-    - [ ] e.g `pixi containerize tool -c/--channel <channel> -v/--version <tool_name>`
+  - [x] Support to containerize a specific tool, without need a pixi manifest
+    - [x] e.g `pixi containerize tool -c/--channel <channel> <tool_name>` (version pinned via MatchSpec, e.g. `tool fastp=0.23.4`)
 - [x] Support the options in a `[tool.pixitainer]` table in the manifest
   - [x] Support backend-specific subtables (`[tool.pixitainer.<backend>]`)
 - [x] Support of container solutions

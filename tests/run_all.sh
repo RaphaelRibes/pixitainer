@@ -171,6 +171,7 @@ TESTS_TO_RUN=(
     "test_dry_run.sh"
     "test_post_cmd.sh"
     "test_add_file.sh"
+    "test_tool_mode.sh"
     "test_pyproject.sh"
     "test_toml_options.sh"
     "test_toml_advanced.sh"
