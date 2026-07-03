@@ -52,11 +52,6 @@ print_tool_usage() {
     echo "  -b, --base-image IMAGE    Specify base image (default: $TOOL_DEFAULT_BASE)"
     echo ""
 
-    echo "Pixi Versioning:"
-    echo "  -V, --pixi-version VER    Specify pixi version (default: same as host)"
-    echo "  -L, --latest              Force the use of the latest pixi version (cannot be used with -V)"
-    echo ""
-
     echo "Advanced Modifications:"
     echo "  -a, --add-file SRC:DEST   Add a file/folder to the image (format: source:destination)"
     echo "      --post-command CMD    Add a command to run after install (repeatable)"
@@ -95,13 +90,17 @@ TOOL_DEFAULT_BASE="debian:stable-slim"
 
 # ---------------------------------------------------------------------------
 # Initialise tool-mode default variables. Call after init_common_defaults.
-# Sets: TOOL_PKGS, CHANNELS, CHANNEL_FLAGS, BASE_IMAGE
+# Sets: TOOL_PKGS, CHANNELS, CHANNEL_FLAGS, BASE_IMAGE, LATEST_PIXI
 # ---------------------------------------------------------------------------
 init_tool_defaults() {
     TOOL_PKGS=()
     CHANNELS=()
     CHANNEL_FLAGS=""
     BASE_IMAGE="$TOOL_DEFAULT_BASE"
+    # Tool mode always uses the latest pixi and never downgrades: install.sh
+    # pulls the newest release and no self-update pin is emitted. There is no
+    # -V/-L override here (unlike project mode).
+    LATEST_PIXI=true
 }
 
 # ---------------------------------------------------------------------------
@@ -116,8 +115,6 @@ parse_tool_args() {
             -c|--channel)       CHANNELS+=("$2");          shift 2 ;;
             -o|--output)        OUTPUT="$2";               shift 2 ;;
             -b|--base-image)    BASE_IMAGE="$2";           shift 2 ;;
-            -V|--pixi-version)  TARGET_PIXI_VERSION="$2";  shift 2 ;;
-            -L|--latest)        LATEST_PIXI=true;          shift   ;;
             -a|--add-file)      EXTRA_FILES+=("$2");       shift 2 ;;
             --post-command)     POST_COMMANDS+=("$2");     shift 2 ;;
             -l|--label)         LABELS+=("$2");            shift 2 ;;

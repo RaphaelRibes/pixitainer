@@ -1,6 +1,6 @@
 # Pixitainer
 
-![Version](https://img.shields.io/badge/Version-0.8.0-blue)
+![Version](https://img.shields.io/badge/Version-0.8.1-blue)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![License](https://img.shields.io/badge/Licence-BSD--3--Clause-green)](LICENSE)
 [![Forge](https://img.shields.io/badge/Forge-Prefix.dev--Forge-yellow)](https://prefix.dev/channels/raphaelribes/packages/pixitainer)
@@ -74,13 +74,13 @@ pixi build
 
 ```bash
 # Apptainer
-pixi global install pixitainer --path pixitainer-0.8.0*.conda --channel conda-forge
+pixi global install pixitainer --path pixitainer-0.8.1*.conda --channel conda-forge
 
 # Singularity
-pixi global install pixitainer-singularity --path pixitainer-singularity-0.8.0*.conda --channel conda-forge
+pixi global install pixitainer-singularity --path pixitainer-singularity-0.8.1*.conda --channel conda-forge
 
 # Docker
-pixi global install pixitainer-docker --path pixitainer-docker-0.8.0*.conda --channel conda-forge
+pixi global install pixitainer-docker --path pixitainer-docker-0.8.1*.conda --channel conda-forge
 ```
 
 ## How to use
@@ -217,7 +217,6 @@ docker run --rm fastp:latest fastp --version
 | `-o, --output`                        | Output `.sif` path / Docker tag. Defaults to the package name.                                                                                            |
 | `-m, --manual`                        | Use a shell entrypoint instead of the tool binary. By default the package's binary is the image entrypoint, so you run the tool directly.                 |
 | `-b, --base-image`                    | Base image (default: `debian:stable-slim`, a small glibc base).                                                                                           |
-| `-V, --pixi-version` / `-L, --latest` | Pixi version selection (same as project mode).                                                                                                            |
 | `-a, --add-file SRC:DEST`             | Add an extra file/folder to the image (repeatable).                                                                                                       |
 | `--post-command CMD`                  | Run an extra command after install (repeatable).                                                                                                          |
 | `-l, --label KEY:VALUE`               | Add a custom label (repeatable).                                                                                                                          |

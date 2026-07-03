@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.1] - 2026-07-03
+
+### 🚀 Features
+
+- The `tool` subcommand now always installs the latest pixi and never downgrades. The `-V` / `--pixi-version` and `-L` / `--latest` options have been removed from `tool` mode (project mode keeps them).
+
 ## [0.8.0] - 2026-07-01
 
 ### 🚀 Features
