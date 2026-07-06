@@ -56,6 +56,11 @@ bootstrap_install() {
     export PIXI_DIR=/opt/pixi
     curl -fsSL https://pixi.sh/install.sh | bash
     export PATH="/opt/pixi/bin:$PATH"
+    
+    if [ ! -x /opt/pixi/bin/pixi ]; then
+        echo "Error: pixi installation failed (/opt/pixi/bin/pixi not found or not executable)" >&2
+        exit 1
+    fi
 }
 
 bootstrap_cleanup() {
