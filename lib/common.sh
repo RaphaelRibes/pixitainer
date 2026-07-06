@@ -3,7 +3,7 @@
 # Sourced by pixi-containerize, pixi-containerize-singularity, pixi-containerize-docker.
 # shellcheck disable=SC2034  # Variables are used by the sourcing scripts.
 
-PIXITAINER_VERSION="0.8.1"
+PIXITAINER_VERSION="0.8.2"
 
 # ---------------------------------------------------------------------------
 # Logging

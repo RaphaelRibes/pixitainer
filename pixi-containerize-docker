@@ -476,8 +476,8 @@ run_docker_build() {
         "${cmd[@]}"
     else
         if ! run_with_spinner "Docker" \
-                "Setting up build context" \
-                _docker_step_extractor \
+                "${DOCKER_SPINNER_INITIAL:-Setting up build context}" \
+                "${DOCKER_STEP_EXTRACTOR:-_docker_step_extractor}" \
                 "${cmd[@]}"; then
             echo "--- LOGS ---"
             cat "$BUILD_LOG_FILE"

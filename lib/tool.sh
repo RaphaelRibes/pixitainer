@@ -357,6 +357,27 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Step extractor for the tool-mode Docker build. Unlike the project-mode
+# _docker_step_extractor (which surfaces docker's own "Step N/M" instructions),
+# this looks only for the "STEP: …" markers echoed inside the single RUN layer,
+# so the spinner shows the same named phases as the SIF backends instead of the
+# giant chained RUN command.
+#
+# Only runtime output is matched, never the echoed RUN *instruction* line (which
+# also contains the literal STEP: strings): the legacy builder streams markers
+# at the start of the line, and BuildKit (--progress=plain) prefixes them with
+# "#N <seconds> ".
+# ---------------------------------------------------------------------------
+_docker_tool_step_extractor() {
+    local line="$1"
+    if [[ "$line" == "STEP: "* ]]; then
+        echo "${line#STEP: }"
+    elif [[ "$line" =~ ^#[0-9]+\ [0-9.]+\ STEP:\ (.+)$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Generate the tool-mode Dockerfile (no manifest, uses `pixi global install`).
 # Sets: DOCKERFILE
 # Requires the Docker entrypoint globals (TMP_DIR, COPY_EXTRA_LINES…).
@@ -396,13 +417,20 @@ generate_tool_dockerfile() {
     # the final image, whereas deleting them in a later layer would not.
     local -a chain=(
         '. /opt/bootstrap.sh'
+        'echo "STEP: Installing system prerequisites and Pixi"'
         'bootstrap_install'
+        'echo "STEP: Installing tool(s) globally"'
         'pixi config set --global run-post-link-scripts insecure'
         "$INSTALL_CMD"
     )
     local cmd slim
-    for cmd in "${POST_COMMANDS[@]}"; do chain+=("$cmd"); done
+    if [ ${#POST_COMMANDS[@]} -gt 0 ]; then
+        chain+=('echo "STEP: Running extra post commands"')
+        for cmd in "${POST_COMMANDS[@]}"; do chain+=("$cmd"); done
+    fi
+    chain+=('echo "STEP: Slimming image"')
     while IFS= read -r slim; do chain+=("$slim"); done < <(tool_slim_steps)
+    chain+=('echo "STEP: Cleaning"')
     chain+=('bootstrap_cleanup')
 
     local run_block="RUN set -e; \\"
@@ -508,6 +536,7 @@ tool_main_docker() {
     WD="$(pwd -P)"                       # for relative --add-file sources
     TMP_DIR="$(pwd -P)/.tmp_pixitainer_docker"
 
+    log "ℹ️ Base image: $BASE_IMAGE"
     log "🐳 Docker image tag: $OUTPUT"
 
     mkdir -p "$TMP_DIR/ctx"
@@ -523,6 +552,12 @@ tool_main_docker() {
         rm -rf "$TMP_DIR"
         exit 0
     fi
+
+    # Drive the shared Docker spinner with the STEP markers baked into the RUN
+    # layer, so tool builds read like the Apptainer/Singularity ones. Full
+    # docker output is still available via -v/--verbose.
+    DOCKER_STEP_EXTRACTOR=_docker_tool_step_extractor
+    DOCKER_SPINNER_INITIAL="Presetup (pulling base image, build context)"
 
     run_docker_build
 

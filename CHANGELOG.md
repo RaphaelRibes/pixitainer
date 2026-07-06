@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2] - 2026-07-05
+
+### 🐛 Bug Fixes
+
+- Docker `tool` builds now show the same clean, named steps as the Apptainer/Singularity backends (Presetup → Installing prerequisites → Installing tool(s) → Slimming → Cleaning) instead of echoing the whole single-layer `RUN` through the spinner. Full build output is still available with `-v` / `--verbose`.
+- The Docker `tool` header now prints the base image (`ℹ️ Base image: …`), matching the SIF backends.
+
 ## [0.8.1] - 2026-07-03
 
 ### 🚀 Features

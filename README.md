@@ -1,6 +1,6 @@
 # Pixitainer
 
-![Version](https://img.shields.io/badge/Version-0.8.1-blue)
+![Version](https://img.shields.io/badge/Version-0.8.2-blue)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![License](https://img.shields.io/badge/Licence-BSD--3--Clause-green)](LICENSE)
 [![Forge](https://img.shields.io/badge/Forge-Prefix.dev--Forge-yellow)](https://prefix.dev/channels/raphaelribes/packages/pixitainer)
@@ -74,13 +74,13 @@ pixi build
 
 ```bash
 # Apptainer
-pixi global install pixitainer --path pixitainer-0.8.1*.conda --channel conda-forge
+pixi global install pixitainer --path pixitainer-0.8.2*.conda --channel conda-forge
 
 # Singularity
-pixi global install pixitainer-singularity --path pixitainer-singularity-0.8.1*.conda --channel conda-forge
+pixi global install pixitainer-singularity --path pixitainer-singularity-0.8.2*.conda --channel conda-forge
 
 # Docker
-pixi global install pixitainer-docker --path pixitainer-docker-0.8.1*.conda --channel conda-forge
+pixi global install pixitainer-docker --path pixitainer-docker-0.8.2*.conda --channel conda-forge
 ```
 
 ## How to use
