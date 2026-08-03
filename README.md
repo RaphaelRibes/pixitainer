@@ -46,13 +46,13 @@ Install pixitainer (Apptainer), pixitainer-singularity (Singularity) or pixitain
 
 ```bash
 # For Apptainer
-pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer
+pixi global install -c https://prefix.dev/raphaelribes pixitainer
 
 # For Singularity
-pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer-singularity
+pixi global install -c https://prefix.dev/raphaelribes pixitainer-singularity
 
 # For Docker
-pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer-docker
+pixi global install -c https://prefix.dev/raphaelribes pixitainer-docker
 ```
 
 ### Developer
@@ -74,13 +74,13 @@ pixi build
 
 ```bash
 # Apptainer
-pixi global install pixitainer --path pixitainer-0.8.2*.conda --channel conda-forge
+pixi global install pixitainer --path pixitainer-0.8.2*.conda
 
 # Singularity
-pixi global install pixitainer-singularity --path pixitainer-singularity-0.8.2*.conda --channel conda-forge
+pixi global install pixitainer-singularity --path pixitainer-singularity-0.8.2*.conda
 
 # Docker
-pixi global install pixitainer-docker --path pixitainer-docker-0.8.2*.conda --channel conda-forge
+pixi global install pixitainer-docker --path pixitainer-docker-0.8.2*.conda
 ```
 
 ## How to use
