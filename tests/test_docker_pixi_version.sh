@@ -3,7 +3,9 @@ set -e
 
 cd "$REPO_DIR"
 IMAGE_TAG="pixitainer-test:pixi-version"
-TARGET_VERSION="0.63.0"
+
+# Use host pixi version — the lockfile must be readable by the container's pixi
+TARGET_VERSION=$(pixi -V | awk '{print $NF}')
 
 docker rmi -f "$IMAGE_TAG" > /dev/null 2>&1 || true
 

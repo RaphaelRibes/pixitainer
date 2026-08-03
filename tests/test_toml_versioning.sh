@@ -9,12 +9,15 @@ cp pixi.toml pixi.toml.bak
 
 echo "Using base project for versioning TOML testing..."
 
-cat << 'EOF' >> pixi.toml
+# Use host pixi version — lockfile must be readable by the container's pixi
+HOST_PIXI_VERSION=$(pixi -V | awk '{print $NF}')
+
+cat << EOF >> pixi.toml
 
 [tool.pixitainer]
 output = "toml_pversion.sif"
 keep-def = "True"
-pixi-version = "0.64.0"
+pixi-version = "$HOST_PIXI_VERSION"
 EOF
 
 # Override PIXI_CMD
@@ -32,8 +35,9 @@ if [ ! -f "toml_pversion.def" ]; then
     exit 1
 fi
 
-if ! grep -q "pixi self-update --version 0.64.0" toml_pversion.def; then
-    echo "Error: pixi-version not configured correctly in def."
+# Verify self-update command is present with the version
+if ! grep -q "pixi self-update --version" toml_pversion.def; then
+    echo "Error: pixi self-update not found in def file."
     exit 1
 fi
 

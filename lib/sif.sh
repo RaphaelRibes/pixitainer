@@ -74,9 +74,9 @@ format_sif_labels() {
 # ---------------------------------------------------------------------------
 build_sif_runscript() {
     if [ "$SEAMLESS" = true ]; then
-        log "ℹ️ Seamless mode enabled"
         RUNSCRIPT_CONTENT="pixi run --locked --as-is -m $MANIFEST_DEST \"\$@\""
     else
+        log "ℹ️ Manual mode: shell entrypoint (call 'pixi run' yourself)"
         RUNSCRIPT_CONTENT='exec "$@"'
     fi
 }
@@ -251,6 +251,7 @@ sif_main() {
     resolve_manifest
     resolve_sif_paths
 
+    log "ℹ️ Base image: $BASE_IMAGE"
     log "📦 Containerizing project from: $WD"
     log "📂 Output target: $OUTPUT_ABS"
 
