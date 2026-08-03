@@ -50,6 +50,9 @@ print_tool_usage() {
 
     echo "Environment & Image Setup:"
     echo "  -b, --base-image IMAGE    Specify base image (default: $TOOL_DEFAULT_BASE)"
+    if [ "$backend" != "docker" ]; then
+        echo "      --cache-dir DIR       Share a package cache directory across tool builds"
+    fi
     echo ""
 
     echo "Advanced Modifications:"
@@ -97,6 +100,7 @@ init_tool_defaults() {
     CHANNELS=()
     CHANNEL_FLAGS=""
     BASE_IMAGE="$TOOL_DEFAULT_BASE"
+    CACHE_DIR=""
     # Tool mode always uses the latest pixi and never downgrades: install.sh
     # pulls the newest release and no self-update pin is emitted. There is no
     # -V/-L override here (unlike project mode).
@@ -115,6 +119,7 @@ parse_tool_args() {
             -c|--channel)       CHANNELS+=("$2");          shift 2 ;;
             -o|--output)        OUTPUT="$2";               shift 2 ;;
             -b|--base-image)    BASE_IMAGE="$2";           shift 2 ;;
+            --cache-dir)        CACHE_DIR="$2";            shift 2 ;;
             -a|--add-file)      EXTRA_FILES+=("$2");       shift 2 ;;
             --post-command)     POST_COMMANDS+=("$2");     shift 2 ;;
             -l|--label)         LABELS+=("$2");            shift 2 ;;
@@ -240,10 +245,19 @@ build_tool_install_cmd() {
 tool_slim_steps() {
     # shellcheck disable=SC2016  # $HOME must stay literal: it expands inside the
     # container at build time, not when this script is sourced on the host.
-    printf '%s\n' \
-        'pixi clean cache --yes >/dev/null 2>&1 || true' \
-        'rm -rf /opt/pixi/bin/pixi /opt/pixi/completions /opt/pixi/cache "$HOME/.cache/rattler" /root/.cache 2>/dev/null || true' \
-        'find /opt/pixi/envs -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true'
+    if [ -n "$CACHE_DIR" ] || [ "$BACKEND" = "docker" ]; then
+        # Cache is shared: for SIF it is bind-mounted from the host (--cache-dir),
+        # for Docker a BuildKit cache mount is always present. Never clean it
+        # here, or the shared cache is wiped (bind mounts are live).
+        printf '%s\n' \
+            'rm -rf /opt/pixi/bin/pixi /opt/pixi/completions /opt/pixi/cache 2>/dev/null || true' \
+            'find /opt/pixi/envs -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true'
+    else
+        printf '%s\n' \
+            'pixi clean cache --yes >/dev/null 2>&1 || true' \
+            'rm -rf /opt/pixi/bin/pixi /opt/pixi/completions /opt/pixi/cache "$HOME/.cache/rattler" /root/.cache 2>/dev/null || true' \
+            'find /opt/pixi/envs -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true'
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -316,9 +330,20 @@ generate_tool_def_file() {
         files_block=$'\n\n'"%files"$'\n'"$FILES_SECTION"
     fi
 
+    # When sharing a host cache, pre-create the mount destination in the base
+    # image: apptainer refuses to bind-mount over a non-existent path, and the
+    # %post section runs after the mount, so it is too late there. %setup runs
+    # on the host against the unpacked rootfs before the container is mounted.
+    # shellcheck disable=SC2016  # $APPTAINER_ROOTFS expands inside the build.
+    local setup_block=""
+    if [ -n "$CACHE_DIR" ]; then
+        setup_block=$'\n\n'"%setup"$'\n'"    mkdir -p \"\$APPTAINER_ROOTFS/root/.cache\""
+    fi
+
     cat <<EOF > "$TARGET_DEF"
 Bootstrap: docker
 From: $BASE_IMAGE
+$setup_block
 
 %labels
     Created_With Pixitainer (https://github.com/RaphaelRibes/pixitainer)
@@ -433,7 +458,10 @@ generate_tool_dockerfile() {
     chain+=('echo "STEP: Cleaning"')
     chain+=('bootstrap_cleanup')
 
-    local run_block="RUN set -e; \\"
+    # Docker tool builds ALWAYS use a BuildKit cache mount for the rattler
+    # download cache: it is free (BuildKit manages it, never part of the image)
+    # and automatic. There is no --cache-dir flag for Docker.
+    local run_block="RUN --mount=type=cache,target=/root/.cache set -e; \\"
     local total=${#chain[@]} idx=0
     for cmd in "${chain[@]}"; do
         idx=$((idx + 1))
@@ -495,6 +523,11 @@ tool_main_sif() {
     log "ℹ️ Base image: $BASE_IMAGE"
     log "📂 Output target: $OUTPUT_ABS"
 
+    if [ -n "$CACHE_DIR" ]; then
+        mkdir -p "$CACHE_DIR"
+        log "ℹ️ Sharing package cache: $CACHE_DIR -> /root/.cache"
+    fi
+
     build_tool_files_section
     build_tool_install_cmd
     resolve_pixi_version
@@ -551,6 +584,13 @@ tool_main_docker() {
         cat "$DOCKERFILE"
         rm -rf "$TMP_DIR"
         exit 0
+    fi
+
+    # The Docker backend always uses a BuildKit cache mount for the download
+    # cache, so --cache-dir is ignored here (it only applies to the SIF
+    # backends). Warn so the flag doesn't silently do nothing.
+    if [ -n "$CACHE_DIR" ]; then
+        log "ℹ️ --cache-dir is ignored by the Docker backend: a BuildKit cache mount is always used."
     fi
 
     # Drive the shared Docker spinner with the STEP markers baked into the RUN
