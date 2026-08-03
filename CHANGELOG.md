@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3] - 2026-08-03
+
+### 🚀 Features
+
+- The `conda-forge` channel is no longer required when installing pixitainer: `pixi global install -c https://prefix.dev/raphaelribes pixitainer` now works out of the box. The README install instructions and the package descriptions have been updated accordingly.
+- New `--cache-dir` option on the `tool` subcommand reuses downloaded conda packages across Apptainer/Singularity builds (host directory bind-mounted into the build, never part of the image). Docker tool builds now always use a BuildKit cache mount automatically, so the download cache is shared across builds for free.
+
 ## [0.8.2] - 2026-07-05
 
 ### 🐛 Bug Fixes

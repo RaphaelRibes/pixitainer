@@ -158,6 +158,11 @@ run_sif_build() {
     tool_name="$(tr '[:lower:]' '[:upper:]' <<< "${binary:0:1}")${binary:1}"
 
     local -a cmd=("$binary" build --force --fakeroot "$OUTPUT_ABS" "$TARGET_DEF")
+    # --bind must precede the positional args, or apptainer counts it as an
+    # extra positional ("accepts 2 arg(s), received N").
+    if [ -n "$CACHE_DIR" ]; then
+        cmd=("$binary" build --force --fakeroot --bind "$CACHE_DIR:/root/.cache" "$OUTPUT_ABS" "$TARGET_DEF")
+    fi
 
     log "🚀 Starting $tool_name build..."
 

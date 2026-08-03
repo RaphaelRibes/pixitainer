@@ -11,7 +11,8 @@
 #   bootstrap_cleanup   # removes curl (if we added it) and cleans the pkg cache
 #
 # POSIX sh compatible — do not add bash-isms.
-# shellcheck shell=sh
+# shellcheck shell=sh disable=SC2086
+# SC2086: $MISSING_PKGS intentionally unquoted for word splitting (e.g. "curl ca-certificates bash")
 
 bootstrap_install() {
     export DEBIAN_FRONTEND=noninteractive

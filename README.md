@@ -1,6 +1,6 @@
 # Pixitainer
 
-![Version](https://img.shields.io/badge/Version-0.8.2-blue)
+![Version](https://img.shields.io/badge/Version-0.8.3-blue)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![License](https://img.shields.io/badge/Licence-BSD--3--Clause-green)](LICENSE)
 [![Forge](https://img.shields.io/badge/Forge-Prefix.dev--Forge-yellow)](https://prefix.dev/channels/raphaelribes/packages/pixitainer)
@@ -46,13 +46,13 @@ Install pixitainer (Apptainer), pixitainer-singularity (Singularity) or pixitain
 
 ```bash
 # For Apptainer
-pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer
+pixi global install -c https://prefix.dev/raphaelribes pixitainer
 
 # For Singularity
-pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer-singularity
+pixi global install -c https://prefix.dev/raphaelribes pixitainer-singularity
 
 # For Docker
-pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer-docker
+pixi global install -c https://prefix.dev/raphaelribes pixitainer-docker
 ```
 
 ### Developer
@@ -74,13 +74,13 @@ pixi build
 
 ```bash
 # Apptainer
-pixi global install pixitainer --path pixitainer-0.8.2*.conda --channel conda-forge
+pixi global install pixitainer --path pixitainer-0.8.3*.conda
 
 # Singularity
-pixi global install pixitainer-singularity --path pixitainer-singularity-0.8.2*.conda --channel conda-forge
+pixi global install pixitainer-singularity --path pixitainer-singularity-0.8.3*.conda
 
 # Docker
-pixi global install pixitainer-docker --path pixitainer-docker-0.8.2*.conda --channel conda-forge
+pixi global install pixitainer-docker --path pixitainer-docker-0.8.3*.conda
 ```
 
 ## How to use
@@ -217,6 +217,7 @@ docker run --rm fastp:latest fastp --version
 | `-o, --output`                        | Output `.sif` path / Docker tag. Defaults to the package name.                                                                                            |
 | `-m, --manual`                        | Use a shell entrypoint instead of the tool binary. By default the package's binary is the image entrypoint, so you run the tool directly.                 |
 | `-b, --base-image`                    | Base image (default: `debian:stable-slim`, a small glibc base).                                                                                           |
+| `--cache-dir DIR`                     | Share a package cache directory across tool builds (Apptainer/Singularity only; Docker uses a BuildKit cache mount automatically).                        |
 | `-a, --add-file SRC:DEST`             | Add an extra file/folder to the image (repeatable).                                                                                                       |
 | `--post-command CMD`                  | Run an extra command after install (repeatable).                                                                                                          |
 | `-l, --label KEY:VALUE`               | Add a custom label (repeatable).                                                                                                                          |
@@ -231,7 +232,7 @@ Pin a version with the MatchSpec syntax (`fastp=0.23.4`, `'python>=3.11'`) rathe
 `tool` images are optimised for size automatically:
 
 - The default base is `debian:stable-slim` rather than a host-matched image. Since every package comes from conda, the base OS is irrelevant, so a small glibc base is used (override with `-b`).
-- The pixi download cache (`~/.cache/rattler`) is removed after install. In containers this cache is copied rather than hard-linked, so dropping it is a large saving.
+- The pixi download cache (`~/.cache/rattler`) is removed after install. In containers this cache is copied rather than hard-linked, so dropping it is a large saving. (When the cache is shared — a BuildKit mount on Docker, or `--cache-dir` on Apptainer/Singularity — the shared cache is left untouched.)
 - The pixi binary itself is removed: it is only needed at build time. The exposed tool binaries are standalone trampolines under `/opt/pixi/bin`, so they keep working without it.
 - For Docker, install and cleanup happen in a single layer, so the cache, the pixi binary and the build-time `curl` never persist in a lower layer.
 
