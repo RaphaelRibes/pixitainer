@@ -50,10 +50,21 @@ usage() {
     echo "  -c, --post-command CMD    Add a command to run in %post section (can be used multiple times)"
     echo "  -l, --label KEY:VALUE     Add a custom label to the image (can be used multiple times)"
     echo "  -k, --keep-def            Export the .def file (do not delete temporary files)"
+    echo "  --env-var KEY=VAL         Inject an environment variable into the container (can be used multiple times)"
+    echo "  --env-file FILE           Read KEY=VAL environment variables from a file"
+    echo "  --cache-dir DIR           Share a package cache directory across builds (Apptainer/Singularity only)"
+    echo "  --gpu                     Enable GPU support (run with 'singularity run --nv')"
     echo ""
 
     echo "Output Options:"
     echo "  -d, --dry-run             Output the .def file to stdout without building the image"
+    echo "  --push URI                Push the built image to a registry (e.g. oras://user/image:tag)"
+    echo ""
+
+    echo "Build Options:"
+    echo "  --no-fakeroot             Build as the invoking user instead of root (default is --fakeroot)"
+    echo "  --arch ARCH               Target architecture to build for (e.g. amd64, arm64; default amd64)"
+    echo "  --build-arg KEY=VAL       Define a build-time variable, substituted as {{ KEY }} in the .def (can be used multiple times)"
     echo ""
 
     echo "General Options:"

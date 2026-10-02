@@ -62,6 +62,10 @@ build_sif_files_section() {
 # ---------------------------------------------------------------------------
 format_sif_labels() {
     CUSTOM_LABELS_SECTION=""
+    if [ "$GPU" = true ]; then
+        CUSTOM_LABELS_SECTION=$'\n'"    Pixitainer_GPU true"
+        log "ℹ️ GPU build: run with 'apptainer run --nv' (Apptainer) or Singularity's --nv to use the GPU."
+    fi
     for label in "${LABELS[@]}"; do
         local formatted_label="${label/:/ }"
         CUSTOM_LABELS_SECTION="$CUSTOM_LABELS_SECTION"$'\n'"    $formatted_label"
@@ -102,12 +106,14 @@ From: $BASE_IMAGE
 
 %files
 $FILES_SECTION
+$(if [ -n "$CACHE_DIR" ]; then printf '\n%%setup\n    mkdir -p "$APPTAINER_ROOTFS/root/.cache"\n'; fi)
 
 %environment
     export PIXI_HOME=/opt/pixi
     export PIXI_DIR=/opt/pixi
     export PIXI_PROJECT_MANIFEST=$MANIFEST_DEST
     export PATH="/opt/pixi/bin:\$PATH"
+$(build_env_section "    export ")
 
 %post
     . /opt/bootstrap.sh
@@ -157,7 +163,30 @@ run_sif_build() {
     local tool_name
     tool_name="$(tr '[:lower:]' '[:upper:]' <<< "${binary:0:1}")${binary:1}"
 
-    local -a cmd=("$binary" build --force --fakeroot "$OUTPUT_ABS" "$TARGET_DEF")
+    if [ "$FAKEROOT" = true ] && ! command -v newuidmap >/dev/null 2>&1; then
+        echo "⚠️  Fakeroot is enabled but 'newuidmap' was not found in PATH."
+        echo "   Apptainer needs the 'uidmap' package (newuidmap/newgidmap) for --fakeroot."
+        echo "   Install it: sudo apt install uidmap"
+        echo "   (or build as the invoking user: pixi containerize --no-fakeroot)"
+        echo ""
+    fi
+
+    local -a cmd=("$binary" build --force)
+    [ "$FAKEROOT" = true ] && cmd+=(--fakeroot)
+    [ -n "$ARCH" ] && cmd+=(--arch "$ARCH")
+    for ba in "${BUILD_ARGS[@]:-}"; do cmd+=(--build-arg "$ba"); done
+    cmd+=("$OUTPUT_ABS" "$TARGET_DEF")
+    # --bind must precede the positional args, or apptainer counts it as an
+    # extra positional ("accepts 2 arg(s), received N").
+    if [ -n "$CACHE_DIR" ]; then
+        mkdir -p "$CACHE_DIR"
+        log "ℹ️ Sharing package cache: $CACHE_DIR -> /root/.cache"
+        cmd=("$binary" build --force)
+        [ "$FAKEROOT" = true ] && cmd+=(--fakeroot)
+        [ -n "$ARCH" ] && cmd+=(--arch "$ARCH")
+        for ba in "${BUILD_ARGS[@]:-}"; do cmd+=(--build-arg "$ba"); done
+        cmd+=(--bind "$CACHE_DIR:/root/.cache" "$OUTPUT_ABS" "$TARGET_DEF")
+    fi
 
     log "🚀 Starting $tool_name build..."
 
@@ -217,6 +246,67 @@ sif_final_cleanup() {
 }
 
 # ---------------------------------------------------------------------------
+# SIF-specific TOML key handler (called by read_toml_config for unknown keys).
+# ---------------------------------------------------------------------------
+apply_toml_backend() {
+    local key="$1" val="$2"
+    local clean_val
+    clean_val=$(echo "$val" | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+    case "$key" in
+        push)     _toml_set_bool PUSH "$clean_val" ;;
+        fakeroot) _toml_set_bool FAKEROOT "$clean_val" ;;
+        arch)     ARCH="$clean_val" ;;
+        build-arg) BUILD_ARGS+=("$clean_val") ;;
+        cache-dir) CACHE_DIR="$clean_val" ;;
+        *)        return 1 ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+# Parse SIF-specific CLI arguments.
+# Runs after parse_common_args; consumes SIF-only flags from REMAINING_ARGS.
+# ---------------------------------------------------------------------------
+parse_sif_args() {
+    local -a leftover=()
+    local i=0
+    while [ $i -lt ${#REMAINING_ARGS[@]} ]; do
+        case "${REMAINING_ARGS[$i]}" in
+            --push)
+                PUSH=true
+                i=$((i + 1))
+                if [ $i -lt ${#REMAINING_ARGS[@]} ]; then
+                    PUSH_URI="${REMAINING_ARGS[$i]}"
+                    i=$((i + 1))
+                fi
+                ;;
+            --no-fakeroot)  FAKEROOT=false; i=$((i + 1)) ;;
+            --arch)         ARCH="${REMAINING_ARGS[$((i + 1))]}"; i=$((i + 2)) ;;
+            --build-arg)    BUILD_ARGS+=("${REMAINING_ARGS[$((i + 1))]}"); i=$((i + 2)) ;;
+            --cache-dir)    CACHE_DIR="${REMAINING_ARGS[$((i + 1))]}"; i=$((i + 2)) ;;
+            *)              leftover+=("${REMAINING_ARGS[$i]}"); i=$((i + 1)) ;;
+        esac
+    done
+    REMAINING_ARGS=("${leftover[@]}")
+}
+
+# ---------------------------------------------------------------------------
+# Push the built SIF image to a registry (apptainer/singularity push).
+# ---------------------------------------------------------------------------
+run_sif_push() {
+    [ "$PUSH" = true ] || return 0
+    [ -n "$PUSH_URI" ] || { echo "Error: --push requires a target URI (e.g. oras://user/image:tag)"; exit 1; }
+    log "🚀 Pushing image to $PUSH_URI..."
+    if [ "$QUIET" = true ]; then
+        "$BACKEND" push "$OUTPUT_ABS" "$PUSH_URI" > /dev/null 2>&1 || exit 1
+    elif [ "$VERBOSE" = true ]; then
+        "$BACKEND" push "$OUTPUT_ABS" "$PUSH_URI"
+    else
+        "$BACKEND" push "$OUTPUT_ABS" "$PUSH_URI" || exit 1
+    fi
+    log "✅ Success! Image pushed to $PUSH_URI"
+}
+
+# ---------------------------------------------------------------------------
 # Shared entry point for the Apptainer and Singularity entrypoint scripts.
 # Usage: sif_main BACKEND "$@"
 #   BACKEND ∈ {apptainer, singularity}
@@ -231,11 +321,19 @@ sif_main() {
     init_common_defaults
     detect_base_image
 
+    # SIF-specific defaults (Docker sets its own at the top of its entrypoint).
+    PUSH="${PUSH:-false}"
+    PUSH_URI="${PUSH_URI:-}"
+    FAKEROOT="${FAKEROOT:-true}"
+    ARCH="${ARCH:-}"
+    declare -a BUILD_ARGS=()
+
     pre_parse_path "$@"
     find_pre_manifest
     read_toml_config "$BACKEND" "$PRE_MANIFEST_SRC"
 
     parse_common_args "$@"
+    parse_sif_args
     if [ ${#REMAINING_ARGS[@]} -gt 0 ]; then
         echo "Error: Unknown option: ${REMAINING_ARGS[0]}"
         usage
@@ -267,6 +365,8 @@ sif_main() {
     sif_dry_run_check
 
     run_sif_build "$BACKEND"
+
+    run_sif_push
 
     sif_final_cleanup
 }

@@ -1,6 +1,6 @@
 # Pixitainer
 
-![Version](https://img.shields.io/badge/Version-0.8.2-blue)
+![Version](https://img.shields.io/badge/Version-0.9.0-blue)
 [![Pixi Badge](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh)
 [![License](https://img.shields.io/badge/Licence-BSD--3--Clause-green)](LICENSE)
 [![Forge](https://img.shields.io/badge/Forge-Prefix.dev--Forge-yellow)](https://prefix.dev/channels/raphaelribes/packages/pixitainer)
@@ -46,13 +46,13 @@ Install pixitainer (Apptainer), pixitainer-singularity (Singularity) or pixitain
 
 ```bash
 # For Apptainer
-pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer
+pixi global install -c https://prefix.dev/raphaelribes pixitainer
 
 # For Singularity
-pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer-singularity
+pixi global install -c https://prefix.dev/raphaelribes pixitainer-singularity
 
 # For Docker
-pixi global install -c https://prefix.dev/raphaelribes -c https://prefix.dev/conda-forge pixitainer-docker
+pixi global install -c https://prefix.dev/raphaelribes pixitainer-docker
 ```
 
 ### Developer
@@ -74,13 +74,13 @@ pixi build
 
 ```bash
 # Apptainer
-pixi global install pixitainer --path pixitainer-0.8.2*.conda --channel conda-forge
+pixi global install pixitainer --path pixitainer-0.9.0*.conda
 
 # Singularity
-pixi global install pixitainer-singularity --path pixitainer-singularity-0.8.2*.conda --channel conda-forge
+pixi global install pixitainer-singularity --path pixitainer-singularity-0.9.0*.conda
 
 # Docker
-pixi global install pixitainer-docker --path pixitainer-docker-0.8.2*.conda --channel conda-forge
+pixi global install pixitainer-docker --path pixitainer-docker-0.9.0*.conda
 ```
 
 ## How to use
@@ -165,6 +165,34 @@ We add `--as-is` to make sure it sticks to the `pixi.lock` file, and it only use
 
 > **WARNING**: `-m /opt/conf/pixi.toml` is mandatory or pixi will use the default one in your current working directory.
 
+### Project-mode options
+
+| Option                             | Meaning                                                                                                                                                                   |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-o, --output`                     | Output `.sif` path / Docker tag. Defaults to `pixitainer.sif` (or `<package>:latest` in tool mode).                                                                        |
+| `-e, --env ENV`                    | Specific environment(s) to install (repeatable).                                                                                                                           |
+| `-n, --no-install`                 | Do not install any environments.                                                                                                                                          |
+| `-a, --add-file SRC:DEST`          | Add an extra file/folder to the image (repeatable).                                                                                                                       |
+| `-c, --post-command CMD`           | Run an extra command after install (repeatable).                                                                                                                          |
+| `-l, --label KEY:VALUE`            | Add a custom label (repeatable).                                                                                                                                          |
+| `-b, --base-image`                 | Base image (default `ubuntu:24.04` for SIF, `debian:stable-slim` for Docker tool builds).                                                                                 |
+| `-m, --manual`                     | Use a raw shell entrypoint instead of seamless `pixi run`.                                                                                                                |
+| `-k, --keep-def`                   | Keep the generated `.def` / `Dockerfile`.                                                                                                                                 |
+| `-d, --dry-run`                    | Print the `.def` / `Dockerfile` without building.                                                                                                                         |
+| `-q, --quiet` / `-v, --verbose`    | Output verbosity.                                                                                                                                                         |
+| **SIF-only (Apptainer/Singularity)** |                                                                                                                                                                         |
+| `--push URI`                       | Push the built image to a registry (`oras://myregistry.com/org/name:tag`) right after the build.                                                                          |
+| `--arch ARCH`                      | Cross-build for another architecture (e.g. `arm64` on x86, default `amd64`).                                                                                              |
+| `--no-fakeroot`                    | Build as the invoking user instead of root (default is `--fakeroot`).                                                                                                     |
+| `--build-arg KEY=VAL`              | Define a build-time variable, substituted as `{{ KEY }}` in the `.def` (repeatable).                                                                                      |
+| `--cache-dir DIR`                  | Share a package cache directory across builds (bind-mounted into the build).                                                                                              |
+| **All backends**                   |                                                                                                                                                                         |
+| `--env-var KEY=VAL`                | Inject an environment variable into the image (repeatable).                                                                                                               |
+| `--env-file FILE`                  | Read `KEY=VAL` environment variables from a file.                                                                                                                        |
+| `--gpu`                            | Mark the image as GPU-capable: Docker adds `NVIDIA_VISIBLE_DEVICES=all` + `NVIDIA_DRIVER_CAPABILITIES` (use with `docker run --gpus all`); Apptainer/Singularity add a `Pixitainer_GPU` label (run with `apptainer run --nv`). |
+
+GPU support is a **runtime** concern: the build-time `--gpu` flag only marks the image so your container runtime knows to pass the GPU through. You still run with `docker run --gpus all`, `apptainer run --nv` or `singularity run --nv` — the flag just prepares the image (Docker env vars / SIF label) for it.
+
 ## Containerizing a single tool (`tool`)
 
 Since **v0.8.0**, you can containerize one or more conda packages directly with `pixi global install`, **without needing a `pixi.toml` or `pixi.lock`**. The `tool` subcommand can be run from anywhere on your system.
@@ -217,6 +245,7 @@ docker run --rm fastp:latest fastp --version
 | `-o, --output`                        | Output `.sif` path / Docker tag. Defaults to the package name.                                                                                            |
 | `-m, --manual`                        | Use a shell entrypoint instead of the tool binary. By default the package's binary is the image entrypoint, so you run the tool directly.                 |
 | `-b, --base-image`                    | Base image (default: `debian:stable-slim`, a small glibc base).                                                                                           |
+| `--cache-dir DIR`                     | Share a package cache directory across tool builds (Apptainer/Singularity only; Docker uses a BuildKit cache mount automatically).                        |
 | `-a, --add-file SRC:DEST`             | Add an extra file/folder to the image (repeatable).                                                                                                       |
 | `--post-command CMD`                  | Run an extra command after install (repeatable).                                                                                                          |
 | `-l, --label KEY:VALUE`               | Add a custom label (repeatable).                                                                                                                          |
@@ -231,7 +260,7 @@ Pin a version with the MatchSpec syntax (`fastp=0.23.4`, `'python>=3.11'`) rathe
 `tool` images are optimised for size automatically:
 
 - The default base is `debian:stable-slim` rather than a host-matched image. Since every package comes from conda, the base OS is irrelevant, so a small glibc base is used (override with `-b`).
-- The pixi download cache (`~/.cache/rattler`) is removed after install. In containers this cache is copied rather than hard-linked, so dropping it is a large saving.
+- The pixi download cache (`~/.cache/rattler`) is removed after install. In containers this cache is copied rather than hard-linked, so dropping it is a large saving. (When the cache is shared — a BuildKit mount on Docker, or `--cache-dir` on Apptainer/Singularity — the shared cache is left untouched.)
 - The pixi binary itself is removed: it is only needed at build time. The exposed tool binaries are standalone trampolines under `/opt/pixi/bin`, so they keep working without it.
 - For Docker, install and cleanup happen in a single layer, so the cache, the pixi binary and the build-time `curl` never persist in a lower layer.
 
@@ -264,6 +293,8 @@ env = ["default"]
 add-file = ["data/config.yaml:/opt/config.yaml"]
 post-command = ["echo 'Setup done' > /opt/setup.log"]
 label = ["APP_VERSION:1.0.0", "AUTHOR:me"]
+env-var = ["MY_COLOR:blue"]   # or ["FOO=bar"]
+gpu = false
 keep-def = false
 dry-run = false
 quiet = false
@@ -369,6 +400,26 @@ alias fixnamespace="sudo sysctl -w kernel.unprivileged_userns_clone=1 && sudo sy
 ```
 Running `fixnamespace` will fix your namespace! However you will have to type it again every time you start your computer.
 
+### `FATAL: newuidmap was not found in PATH` (fakeroot)
+
+Apptainer builds run with `--fakeroot` by default (hardcoded since v0.8;
+v0.9 makes it configurable with a `--no-fakeroot` opt-out). Fakeroot maps your
+user to root inside the build and needs the setuid `newuidmap`/`newgidmap`
+helpers. On a fresh Debian/Ubuntu these are not installed, so the build dies
+early with `FATAL: newuidmap was not found in PATH`. Install the `uidmap`
+package:
+
+```sh
+sudo apt install uidmap
+```
+
+Your user also needs a sub-uid/sub-gid range in `/etc/subuid` and `/etc/subgid`
+(usually assigned when the account is created; `uidmap` sets a default). If the
+build still fails with a sub-uid mapping error, add a range for your user
+(`sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 $USER`),
+then log out and back in. On v0.9+ you can skip fakeroot entirely with
+`--no-fakeroot`.
+
 ## How ?
 
 This was implemented as a [pixi extension](https://pixi.sh/latest/integration/extensions/introduction/), so you just type `pixi containerize`, add some options, and tada!
@@ -417,6 +468,15 @@ TODO:
     - [x] Override container working directory (`--workdir`)
   - [x] Support to containerize a specific tool, without need a pixi manifest
     - [x] e.g `pixi containerize tool -c/--channel <channel> <tool_name>` (version pinned via MatchSpec, e.g. `tool fastp=0.23.4`)
+  - [x] SIF parity with Docker (0.9.0)
+    - [x] Push SIF image to a registry (`--push`)
+    - [x] Cross-architecture builds (`--arch`)
+    - [x] Build-time variables (`--build-arg` via Apptainer's native flag)
+    - [x] Fakeroot by default with `--no-fakeroot` opt-out
+    - [x] Shared package cache in project mode (`--cache-dir`)
+  - [x] Inject environment variables on all backends (`--env-var`, `--env-file`)
+  - [x] GPU support (`--gpu`): Docker NVIDIA env vars / SIF `Pixitainer_GPU` label
+  - [x] Docker project-mode BuildKit cache mount
 - [x] Support the options in a `[tool.pixitainer]` table in the manifest
   - [x] Support backend-specific subtables (`[tool.pixitainer.<backend>]`)
 - [x] Support of container solutions

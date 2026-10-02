@@ -3,7 +3,7 @@
 # Sourced by pixi-containerize, pixi-containerize-singularity, pixi-containerize-docker.
 # shellcheck disable=SC2034  # Variables are used by the sourcing scripts.
 
-PIXITAINER_VERSION="0.8.2"
+PIXITAINER_VERSION="0.9.0"
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -64,10 +64,50 @@ init_common_defaults() {
     QUIET=false
     DRY_RUN=false
     NO_INSTALL=false
+    GPU=false
     ENVS=()
     EXTRA_FILES=()
     POST_COMMANDS=()
     LABELS=()
+    ENV_VARS=()
+}
+
+# ---------------------------------------------------------------------------
+# Read a KEY=VAL env file into ENV_VARS (skips blanks and # comments).
+# ---------------------------------------------------------------------------
+_load_env_file() {
+    local file="$1"
+    [ -f "$file" ] || { echo "Error: --env-file '$file' does not exist" >&2; exit 1; }
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%%$'\r'}"          # strip CR (Windows line endings)
+        case "$line" in
+            ""|"#"*) continue ;;       # skip blanks and comments
+        esac
+        if [[ "$line" != *"="* ]]; then
+            echo "Error: invalid --env-file line (expected KEY=VAL): '$line'" >&2
+            exit 1
+        fi
+        ENV_VARS+=("$line")
+    done < "$file"
+}
+
+# ---------------------------------------------------------------------------
+# Build the environment-variable snippet for a container definition.
+# $1 = emission prefix: "export " for SIF %environment, or "ENV " for Docker.
+# Prints one line per var, e.g. `export MY_KEY="myval"`.
+# ---------------------------------------------------------------------------
+build_env_section() {
+    local prefix="$1"
+    local var line key val
+    for var in "${ENV_VARS[@]:-}"; do
+        key="${var%%=*}"
+        # Skip empty or malformed entries (e.g. an empty string in ENV_VARS would
+        # otherwise emit a bare "ENV =""" in a Dockerfile, which Docker rejects
+        # with "ENV names can not be blank").
+        [ -n "$key" ] || continue
+        [ "$var" = "$key" ] && val="" || val="${var#*=}"
+        printf '%s%s="%s"\n' "$prefix" "$key" "$val"
+    done
 }
 
 # ---------------------------------------------------------------------------
@@ -156,13 +196,14 @@ apply_toml_common() {
                       _toml_set_bool SEAMLESS "$clean_val" ;;
         base-image)   BASE_IMAGE="$clean_val" ;;
         no-install)   _toml_set_bool NO_INSTALL  "$clean_val" ;;
+        gpu)          _toml_set_bool GPU         "$clean_val" ;;
         pixi-version) TARGET_PIXI_VERSION="$clean_val" ;;
         latest)       _toml_set_bool LATEST_PIXI "$clean_val" ;;
         keep-def)     _toml_set_bool KEEP_DEF    "$clean_val" ;;
         dry-run)      _toml_set_bool DRY_RUN     "$clean_val" ;;
         quiet)        _toml_set_bool QUIET       "$clean_val" ;;
         verbose)      _toml_set_bool VERBOSE     "$clean_val" ;;
-        env|add-file|post-command|label)
+        env|add-file|post-command|label|env-var)
             _apply_toml_array "$key" "$val" "$reset_mode"
             ;;
         *)
@@ -185,6 +226,7 @@ _apply_toml_array() {
             add-file)     EXTRA_FILES=() ;;
             post-command) POST_COMMANDS=() ;;
             label)        LABELS=() ;;
+            env-var)      ENV_VARS=() ;;
         esac
     fi
 
@@ -196,6 +238,7 @@ _apply_toml_array() {
             add-file)     EXTRA_FILES+=("$elem_clean") ;;
             post-command) POST_COMMANDS+=("$elem_clean") ;;
             label)        LABELS+=("$elem_clean") ;;
+            env-var)      ENV_VARS+=("$elem_clean") ;;
         esac
     done < <(echo "$val" | grep -o '"[^"]*"')
 }
@@ -290,6 +333,9 @@ parse_common_args() {
             -L|--latest)        LATEST_PIXI=true;        shift   ;;
             -a|--add-file)      EXTRA_FILES+=("$2");     shift 2 ;;
             -c|--post-command)  POST_COMMANDS+=("$2");   shift 2 ;;
+            --env-var)          ENV_VARS+=("$2");        shift 2 ;;
+            --env-file)         _load_env_file "$2";     shift 2 ;;
+            --gpu)              GPU=true;                shift   ;;
             -l|--label)         LABELS+=("$2");          shift 2 ;;
             -k|--keep-def)      KEEP_DEF=true;           shift   ;;
             -d|--dry-run)       DRY_RUN=true;            shift   ;;

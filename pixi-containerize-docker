@@ -51,6 +51,9 @@ usage() {
     echo "  -b, --base-image IMAGE    Specify base image (default: auto-detected from host)"
     echo "  -e, --env ENV             Specific environment(s) to install (can be used multiple times)"
     echo "  -n, --no-install          Do not install any environments"
+    echo "  --env-var KEY=VAL         Inject an environment variable into the container (can be used multiple times)"
+    echo "  --env-file FILE           Read KEY=VAL environment variables from a file"
+    echo "  --gpu                     Enable GPU support (run with 'docker run --gpus all')"
     echo ""
 
     echo "Pixi Versioning:"
@@ -368,6 +371,10 @@ ENV PIXI_DIR=/opt/pixi
 ENV PATH="/opt/pixi/bin:\$PATH"
 ENV PIXI_PROJECT_MANIFEST=$MANIFEST_DEST
 $pixi_version_env_line
+$(if [ "$GPU" = true ]; then
+    printf '\n# GPU support: makes the image pick up the GPU at "docker run --gpus all"\nENV NVIDIA_VISIBLE_DEVICES=all\nENV NVIDIA_DRIVER_CAPABILITIES=compute,utility\n'
+fi)
+$(build_env_section "ENV ")
 
 # --- Copy project files ---
 COPY ctx/bootstrap.sh /opt/bootstrap.sh
@@ -383,9 +390,11 @@ RUN set -e \\
 
 # --- Install the Pixi environment ---
 WORKDIR $effective_workdir
-RUN pixi config set --local run-post-link-scripts insecure \\
-    && $INSTALL_CMD \\
-    && pixi clean cache --yes
+# BuildKit cache mount: shared download cache across projects, never part of the image.
+# The cache lives only in the mount (ephemeral), so no pixi clean cache is needed.
+RUN --mount=type=cache,target=/root/.cache set -e \\
+    && pixi config set --local run-post-link-scripts insecure \\
+    && $INSTALL_CMD
 $post_run_lines
 
 # --- Runtime user ---

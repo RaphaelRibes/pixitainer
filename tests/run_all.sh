@@ -39,6 +39,14 @@ if [ -z "$CONTAINER_CMD" ]; then
     fi
 fi
 
+# --- Hermetic test env ---
+# Apptainer/Singularity forward host env vars (SSL_CERT_FILE, SSL_CERT_DIR, ...)
+# into the container by default. A host-specific CA path (e.g. /etc/ssl/cert.pem on
+# Arch/CachyOS) may not exist inside the pinned ubuntu base, which makes pixi's
+# reqwest panic ("No CA certificates were loaded") at runtime. Unset them so the
+# suite is hermetic regardless of the host.
+unset SSL_CERT_FILE SSL_CERT_DIR
+
 # Base directory for individual test workspaces
 BASE_WORK_DIR="${TESTS_DIR}/test_workspaces"
 SHARED_REPO_DIR="${TESTS_DIR}/TestRepo"
@@ -172,11 +180,13 @@ TESTS_TO_RUN=(
     "test_post_cmd.sh"
     "test_add_file.sh"
     "test_tool_mode.sh"
+    "test_tool_cache.sh"
     "test_pyproject.sh"
     "test_toml_options.sh"
     "test_toml_advanced.sh"
     "test_toml_versioning.sh"
     "test_toml_path.sh"
+    "test_sif_push.sh"
 )
 
 # --- Wait for completion ---
