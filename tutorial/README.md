@@ -35,6 +35,7 @@ Everything uses the same project, [`copy-project/`](copy-project/): a `pixi.toml
 | 8 | [Docker backend](08-docker.md) | Build the same image with Docker |
 | 9 | [`tool` mode](09-tool-mode.md) | Containerize a single package, no project |
 | 10 | [TOML configuration](10-toml-config.md) | Put your options in `pixi.toml` |
+| 11 | [Advanced options](11-advanced-options.md) | Env vars, shared cache, GPU, pushing |
 
 ---
 
