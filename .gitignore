@@ -8,3 +8,6 @@ tests/TestRepo*/
 rattler-build-log.txt
 output/
 *.conda
+
+# Local planning
+.hermes/

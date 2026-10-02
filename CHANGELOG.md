@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.0] - 2026-09-28
+
+### 🚀 Features
+
+- SIF (Apptainer/Singularity) backends now raise close to Docker parity:
+  - `--push URI` pushes the built image (`oras://…`) straight to a registry after the build.
+  - `--arch ARCH` cross-builds for another architecture (e.g. `arm64` on x86), alongside the default `--fakeroot` with a new `--no-fakeroot` opt-out.
+  - `--build-arg KEY=VAL` passes build-time variables, substituted as `{{ KEY }}` in the `.def` (via Apptainer's native flag, not `%arguments`).
+  - `--cache-dir DIR` now works in **project mode**, not just `tool` mode — a host directory is bind-mounted into the build so downloaded packages are reused across builds (a `%setup` block pre-creates `/root/.cache` so the mount succeeds on slim bases).
+- New cross-backend `--env-var KEY=VAL` / `--env-file FILE` inject environment variables into the image on **all** backends (SIF `%environment`, Docker `ENV` lines).
+- New `--gpu` flag marks an image as GPU-capable: Docker emits `NVIDIA_VISIBLE_DEVICES=all` + `NVIDIA_DRIVER_CAPABILITIES` (works with `docker run --gpus all`); Apptainer/Singularity add a `Pixitainer_GPU` label and print the `run --nv` hint.
+- Docker project-mode builds now use a BuildKit cache mount for the rattler download cache (same as `tool` mode), so the cache is shared across builds for free and no longer part of the final image.
+
 ## [0.8.3] - 2026-08-03
 
 ### 🚀 Features
