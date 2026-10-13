@@ -1,78 +1,42 @@
 # Step 3 — Run it locally with pixi
 
-**Goal:** run the `copy` task with pixi and confirm it works before containerizing.
+**Goal:** run the `thumb` task with pixi and confirm it works before containerizing.
 
-## 3.1 Create a test file
+## 3.1 Create a test image
+
+Any image will do — a photo, a screenshot. Or generate a small one:
 
 ```bash
-echo "hello pixitainer" > input.txt
+echo 'x' > /dev/null   # no-op; use any real image you have
+```
+
+If you don't have one handy, grab an open image:
+
+```bash
+curl -o photo.png https://picsum.photos/320/200
 ```
 
 ## 3.2 Run the task
 
 ```bash
-pixi run copy input.txt output.txt
+pixi run thumb -w 100 photo.png small.png
 ```
 
 You should see:
 
 ```
-✨ Pixi task (copy): python copy.py input.txt output.txt
-Copied input.txt -> output.txt
+✨ Pixi task (thumb): python thumb.py -w 100 photo.png small.png
+photo.png (99x62) -> small.png
 ```
 
 ## 3.3 Verify and clean up
 
 ```bash
-cat output.txt        # → hello pixitainer
-rm -f input.txt output.txt
+file small.png        # → PNG image data, 99 x 62
+rm -f small.png
 ```
 
 Your project works. Now you're ready to freeze it into a container.
-
----
-
-## Exercises
-
-**Exercise 3.1** — Fill in the missing word. You run a pixi task with `pixi ____ <task>`:
-
-<details>
-<summary>Show answer</summary>
-
-`run`
-
-```bash
-pixi run copy input.txt output.txt
-```
-
-</details>
-
-**Exercise 3.2** — Fill in the missing word. The `copy` task takes two arguments: the source and the ____:
-
-<details>
-<summary>Show answer</summary>
-
-`destination` (or `dest`)
-
-```bash
-pixi run copy input.txt output.txt
-#                    source     destination
-```
-
-</details>
-
-**Exercise 3.3** — Fill in the missing word. To check the copied file's contents, you use `____ output.txt`:
-
-<details>
-<summary>Show answer</summary>
-
-`cat`
-
-```bash
-cat output.txt
-```
-
-</details>
 
 ---
 

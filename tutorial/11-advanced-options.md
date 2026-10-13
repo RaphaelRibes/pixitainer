@@ -9,13 +9,13 @@ These were added in **v0.9.0**. They work across both the Apptainer/Singularity 
 Pass `KEY=VAL` pairs that become environment variables inside the container. Use them for API keys, config, or any value your app reads at runtime.
 
 ```bash
-pixi containerize -a copy.py:/opt/conf/copy.py --env-var FOO=bar -o copy.sif
+pixi containerize -a thumb.py:/opt/conf/thumb.py --env-var FOO=bar -o thumb.sif
 ```
 
 You can repeat `--env-var` for several variables, or read them from a file with `--env-file` (one `KEY=VAL` per line):
 
 ```bash
-pixi containerize --env-file my.env -o copy.sif
+pixi containerize --env-file my.env -o thumb.sif
 ```
 
 On the SIF backends these become `export FOO="bar"` lines in the image's `%environment`; on Docker they become `ENV` instructions. They're baked in at build time, so no flag is needed at `run`.
@@ -25,7 +25,7 @@ On the SIF backends these become `export FOO="bar"` lines in the image's `%envir
 Every build re-downloads and re-installs your dependencies. A **cache directory** lets one build reuse another's packages, making repeated builds much faster.
 
 ```bash
-pixi containerize --cache-dir /tmp/pkgcache -o copy.sif
+pixi containerize --cache-dir /tmp/pkgcache -o thumb.sif
 ```
 
 The cache is bind-mounted into the container during the build (`%setup` mounts `/root/.cache`). Point several projects at the same directory to share it.
@@ -38,10 +38,10 @@ If your workflow needs the GPU (PyTorch, CUDA, etc.), add `--gpu`. It loads the 
 
 ```bash
 # build
-pixi containerize --gpu -o copy.sif
+pixi containerize --gpu -o thumb.sif
 
 # run — you must also pass --nv to Apptainer / --gpus all to Docker
-apptainer run --nv copy.sif ...
+apptainer run --nv thumb.sif ...
 docker run --gpus all ...
 ```
 
@@ -51,10 +51,10 @@ docker run --gpus all ...
 
 ```bash
 # ORAS (SIF backends)
-pixi containerize -o copy.sif --push oras://ghcr.io/you/copy:v0.1
+pixi containerize -o thumb.sif --push oras://ghcr.io/you/thumb:v0.1
 
 # Docker
-pixi containerize-docker --push copy:latest
+pixi containerize-docker --push thumb:latest
 ```
 
 For Docker, `--push` uses your existing registry login (e.g. `docker login`).
@@ -76,55 +76,15 @@ Dry-run tip: add `-d` to *any* of these commands to print the generated `.def`/`
 
 ---
 
-## Exercises
+## Try it
 
-**Exercise 11.1** — Fill in the missing word. The flag to inject an environment variable is `--env-____`:
-
-<details>
-<summary>Show answer</summary>
-
-`var`
+Pick one flag and inspect what it actually changes in the generated definition:
 
 ```bash
-pixi containerize --env-var FOO=bar -o copy.sif
+pixi containerize -d --env-var FOO=bar -o thumb.sif
 ```
 
-</details>
-
-**Exercise 11.2** — Fill in the missing word. `--cache-dir` lets one build __Reuse__ another's downloaded packages:
-
-<details>
-<summary>Show answer</summary>
-
-`reuse` (a shared package cache speeds up repeated builds)
-
-</details>
-
-**Exercise 11.3** — Fill in the missing word. To use the GPU at run time you also pass `--__` to Apptainer:
-
-<details>
-<summary>Show answer</summary>
-
-`nv`
-
-```bash
-apptainer run --nv copy.sif ...
-```
-
-</details>
-
-**Exercise 11.4** — Fill in the missing word. `--push` sends the image to a __.
-
-<details>
-<summary>Show answer</summary>
-
-`registry`
-
-```bash
-pixi containerize -o copy.sif --push oras://ghcr.io/you/copy:v0.1
-```
-
-</details>
+Look for the `%environment` block — you'll see `export FOO="bar"` appear. Then try `--gpu` and look for the `Pixitainer_GPU` label. Dry-run is the fastest way to learn what each flag does without waiting for a build.
 
 ---
 

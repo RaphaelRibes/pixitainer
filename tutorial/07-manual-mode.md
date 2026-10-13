@@ -9,7 +9,7 @@ Seamless mode (default) is great for running pixi tasks. But sometimes you want 
 Build with manual mode:
 
 ```bash
-pixi containerize -m -a copy.py:/opt/conf/copy.py -o copy-manual.sif
+pixi containerize -m -a thumb.py:/opt/conf/thumb.py -o thumb-manual.sif
 ```
 
 ## 7.2 Run a task manually
@@ -17,8 +17,8 @@ pixi containerize -m -a copy.py:/opt/conf/copy.py -o copy-manual.sif
 Now the entrypoint is a plain shell, and you call `pixi` yourself:
 
 ```bash
-apptainer run -f --bind "$PWD:/work" copy-manual.sif \
-    pixi run --as-is -m /opt/conf/pixi.toml copy /work/input.txt /work/output.txt
+apptainer run -f --bind "$PWD:/work" thumb-manual.sif \
+    pixi run --as-is -m /opt/conf/pixi.toml thumb -w 100 /work/photo.png /work/small.png
 ```
 
 > **Note:** `-m /opt/conf/pixi.toml` is mandatory in manual mode — otherwise pixi looks for a manifest in the current directory and won't find your project.
@@ -26,64 +26,29 @@ apptainer run -f --bind "$PWD:/work" copy-manual.sif \
 ## 7.3 Drop into a shell
 
 ```bash
-apptainer shell copy-manual.sif
+apptainer shell thumb-manual.sif
 ```
+
+You'll get an interactive shell inside the image. Run anything you'd type with pixi:
+
+```bash
+pixi run --as-is -m /opt/conf/pixi.toml python -c "import PIL; print(PIL.__version__)"
+```
+
+> **Note:** in manual mode, only `pixi` is on `$PATH` — your environment's tools (like `python`) are reached *through* pixi, not directly. That's why the `-m /opt/conf/pixi.toml` prefix is needed on every command.
 
 ---
 
-## Exercises
+## Try it
 
-**Exercise 7.1** — Fill in the missing word. The flag for manual mode is `-____` (or `--manual`):
+Compare the two run commands side by side:
 
-<details>
-<summary>Show answer</summary>
+| Mode | Entrypoint handles | You must type |
+|------|-------------------|---------------|
+| Seamless | `pixi run` | `thumb -w 100 ...` |
+| Manual | a shell | `pixi run --as-is -m /opt/conf/pixi.toml thumb -w 100 ...` |
 
-`m`
-
-```bash
-pixi containerize -m -a copy.py:/opt/conf/copy.py -o copy-manual.sif
-```
-
-</details>
-
-**Exercise 7.2** — Fill in the missing word. In manual mode, the entrypoint is a plain ____, not `pixi run`:
-
-<details>
-<summary>Show answer</summary>
-
-`shell`
-
-```bash
-# you call pixi yourself inside the image
-```
-
-</details>
-
-**Exercise 7.3** — Fill in the missing word. In manual mode you must pass `-m /opt/conf/____` so pixi finds your manifest:
-
-<details>
-<summary>Show answer</summary>
-
-`pixi.toml`
-
-```bash
-pixi run --as-is -m /opt/conf/pixi.toml copy /work/input.txt /work/output.txt
-```
-
-</details>
-
-**Exercise 7.4** — Fill in the missing word. To get an interactive shell inside the image, use `apptainer ____`:
-
-<details>
-<summary>Show answer</summary>
-
-`shell`
-
-```bash
-apptainer shell copy-manual.sif
-```
-
-</details>
+Seamless saves you the `-m /opt/conf/pixi.toml` ceremony on every call. Manual is what you want when you're debugging or calling the environment non-interactively from a script.
 
 ---
 

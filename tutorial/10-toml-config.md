@@ -8,8 +8,8 @@ Since **v0.6.0**, Pixitainer reads a `[tool.pixitainer]` table in your manifest.
 
 ```toml
 [tool.pixitainer]
-output = "copy.sif"
-add-file = ["copy.py:/opt/conf/copy.py"]
+output = "thumb.sif"
+add-file = ["thumb.py:/opt/conf/thumb.py"]
 ```
 
 Now a plain `pixi containerize` picks up those defaults:
@@ -23,7 +23,7 @@ pixi containerize
 CLI arguments **always win** over the TOML table:
 
 ```bash
-pixi containerize -o my-copy.sif
+pixi containerize -o my-thumb.sif
 ```
 
 ## 10.3 Per-backend overrides
@@ -32,77 +32,36 @@ Since **v0.7.0**, you can set different defaults per backend:
 
 ```toml
 [tool.pixitainer]
-output = "copy.sif"
-add-file = ["copy.py:/opt/conf/copy.py"]
+output = "thumb.sif"
+add-file = ["thumb.py:/opt/conf/thumb.py"]
 
 [tool.pixitainer.docker]
-output = "copy:latest"
+output = "thumb:latest"
 ```
 
 Priority (lowest → highest):
-
-```
-[tool.pixitainer]  <  [tool.pixitainer.<backend>]  <  CLI arguments
-```
-
----
-
-## Exercises
-
-**Exercise 10.1** — Fill in the missing word. The configuration table is called `[tool.____]`:
-
-<details>
-<summary>Show answer</summary>
-
-`pixitainer`
-
-```toml
-[tool.pixitainer]
-output = "copy.sif"
-```
-
-</details>
-
-**Exercise 10.2** — Fill in the missing word. The `add-file` key adds a file into the image, in the format `____:DEST`:
-
-<details>
-<summary>Show answer</summary>
-
-`SRC`
-
-```toml
-add-file = ["copy.py:/opt/conf/copy.py"]
-#            SRC        DEST
-```
-
-</details>
-
-**Exercise 10.3** — Fill in the missing word. CLI arguments have the ____ priority (highest or lowest):
-
-<details>
-<summary>Show answer</summary>
-
-`highest`
 
 ```text
 [tool.pixitainer]  <  [tool.pixitainer.<backend>]  <  CLI arguments
 ```
 
-</details>
+---
 
-**Exercise 10.4** — Fill in the missing word. To set Docker-specific defaults, use the `[tool.pixitainer.____]` table:
+## Try it
 
-<details>
-<summary>Show answer</summary>
+Put the `[tool.pixitainer]` table from section 10.1 in your manifest, then run:
 
-`docker`
-
-```toml
-[tool.pixitainer.docker]
-output = "copy:latest"
+```bash
+pixi containerize -d
 ```
 
-</details>
+You should see the image default to `thumb.sif` with `thumb.py` added — no flags needed. Then override just the output name:
+
+```bash
+pixi containerize -d -o other.sif
+```
+
+Watch the output target change but the `add-file` stay. Same option, two sources, CLI wins.
 
 ---
 

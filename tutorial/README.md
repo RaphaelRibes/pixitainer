@@ -1,32 +1,23 @@
 # Pixitainer Wiki
 
-Learn Pixitainer step by step by containerizing one small project the whole way: a tiny Python CLI called **`copy`** that copies a file.
+Learn Pixitainer step by step by containerizing one small project the whole way: a tiny Python CLI called **`thumb`** that turns any image into a thumbnail.
 
 ## How to use this wiki
 
-- Each page is **one step**. Read it, do the exercises, then move to the next page.
-- Exercises are **fill-in-the-blank**: a command or word with a missing part, like `pixi containerize -a copy.py:____`.
-- **No answers are shown inline.** To check yourself, click the **spoiler** at the bottom of each exercise:
-
-<details>
-<summary>Example spoiler — click me</summary>
-
-The answer is hidden here. Click to reveal it.
-
-</details>
-
+- Each page is **one step**. Read it, run the commands, then move to the next page.
+- Most pages end with a **Try it** section — a short exercise that makes you use what you just learned, with the expected output shown inline.
 - Work through the pages **in order** — each one builds on the last.
 
 ## The example project
 
-Everything uses the same project, [`copy-project/`](copy-project/): a `pixi.toml` manifest, a `copy.py` script, and a `pixi.lock` lockfile. You'll create it yourself in [Step 2](02-create-project.md).
+Everything uses the same project, [`thumb-project/`](thumb-project/): a `pixi.toml` manifest, a `thumb.py` script, and a `pixi.lock` lockfile. You'll create it yourself in [Step 2](02-create-project.md). It's deliberately small and dependency-light (Python + Pillow) so you can follow along with any image you have.
 
 ## Table of contents
 
 | # | Page | What you'll do |
 |---|------|----------------|
 | 1 | [Install pixi & Pixitainer](01-install.md) | Set up the tools |
-| 2 | [Create the `copy` project](02-create-project.md) | Write the manifest and script |
+| 2 | [Create the `thumb` project](02-create-project.md) | Write the manifest and script |
 | 3 | [Run it locally](03-run-locally.md) | Run the task with pixi |
 | 4 | [Containerize with Apptainer](04-containerize-apptainer.md) | Build a `.sif` image |
 | 5 | [Run the task in the container](05-run-in-container.md) | Run the task from the image |

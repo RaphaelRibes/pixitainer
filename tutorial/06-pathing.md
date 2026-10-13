@@ -6,7 +6,7 @@
 
 Inside the container, the working directory is **`/opt/conf`** (where Pixitainer puts your project), *not* the directory you ran `apptainer run` from. So:
 
-- A relative path like `input.txt` would resolve to `/opt/conf/input.txt` — which doesn't exist on your host.
+- A relative path like `photo.png` would resolve to `/opt/conf/photo.png` — which doesn't exist on your host.
 - The container is **read-only** by default, so you can't write into `/opt/conf` either.
 
 ## 6.2 The fix
@@ -14,68 +14,23 @@ Inside the container, the working directory is **`/opt/conf`** (where Pixitainer
 **Bind** your current directory into the container and use **absolute paths**:
 
 ```bash
-apptainer run -f --bind "$PWD:/work" copy.sif copy /work/input.txt /work/output.txt
+apptainer run -f --bind "$PWD:/work" thumb.sif thumb -w 100 /work/photo.png /work/small.png
 ```
 
 - `--bind "$PWD:/work"` makes your current folder appear as `/work` inside the container.
-- `/work/input.txt` and `/work/output.txt` are then real, writable paths.
+- `/work/photo.png` and `/work/small.png` are then real, writable paths.
 
 ---
 
-## Exercises
+## Try it
 
-**Exercise 6.1** — Fill in the missing word. Inside the container, the working directory is `____`:
-
-<details>
-<summary>Show answer</summary>
-
-`/opt/conf`
+Run the exact same command but **without** `--bind`, passing a relative path:
 
 ```bash
-# the container's cwd is /opt/conf, not your host directory
+apptainer run -f thumb.sif thumb -w 100 photo.png small.png
 ```
 
-</details>
-
-**Exercise 6.2** — Fill in the missing word. The container is ____ by default, so you can't write into `/opt/conf`:
-
-<details>
-<summary>Show answer</summary>
-
-`read-only`
-
-```bash
-# use --bind + absolute paths, or add --writable-tmpfs
-```
-
-</details>
-
-**Exercise 6.3** — Fill in the missing word. The `--bind "$PWD:/work"` flag makes your current folder appear as `____` inside the container:
-
-<details>
-<summary>Show answer</summary>
-
-`/work`
-
-```bash
---bind "$PWD:/work"   # host $PWD → container /work
-```
-
-</details>
-
-**Exercise 6.4** — Fill in the missing word. If a task tries to write to `/opt/conf` you get the error `os error ____` (read-only file system):
-
-<details>
-<summary>Show answer</summary>
-
-`30`
-
-```bash
-# os error 30 = read-only file system
-# fix: --bind + absolute paths, or --writable-tmpfs
-```
-
-</details>
+You'll get a "No such file or directory" (or a crash trying to write to a read-only FS). This is the single most common mistake with Pixitainer images — once you've hit it and understood *why*, the `--bind` habit sticks.
 
 ---
 

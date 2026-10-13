@@ -1,11 +1,13 @@
-# Step 2 — Create the `copy` project
+# Step 2 — Create the `thumb` project
 
-**Goal:** write a tiny Python CLI called `copy` that copies a file, managed by pixi.
+**Goal:** write a tiny Python CLI that makes image thumbnails, managed by pixi.
+
+We'll use a small project anyone can follow: a script called `thumb` that shrinks an image down to a thumbnail. It depends on Pillow (a real third-party library) — which is exactly why you'll want it in a container later.
 
 ## 2.1 Make the directory
 
 ```bash
-mkdir copy-project && cd copy-project
+mkdir thumb-project && cd thumb-project
 ```
 
 ## 2.2 Write the manifest
@@ -14,45 +16,52 @@ Create `pixi.toml`:
 
 ```toml
 [workspace]
-name = "copy"
+name = "thumb"
 version = "0.1.0"
-description = "A tiny Python CLI that copies files"
+description = "A tiny CLI that turns any image into a thumbnail"
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 
 [dependencies]
 python = ">=3.11"
+pillow = ">=10"
 
 [tasks]
-copy = "python copy.py"
+thumb = "python thumb.py"
 ```
 
 ## 2.3 Write the script
 
-Create `copy.py` — a tiny file-copying CLI using only the Python standard library:
+Create `thumb.py` — shrink an image to a max width, keeping the aspect ratio:
 
 ```python
 #!/usr/bin/env python3
-"""copy — a tiny file-copying CLI.
+"""thumb — turn any image into a thumbnail.
 
-Usage: copy SRC DEST
+Usage: thumb -w WIDTH SRC DEST
 """
-import shutil
-import sys
+import argparse
+from PIL import Image
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
-        print("Usage: copy SRC DEST", file=sys.stderr)
-        return 2
-    src, dest = sys.argv[1], sys.argv[2]
-    shutil.copy2(src, dest)
-    print(f"Copied {src} -> {dest}")
+    p = argparse.ArgumentParser(prog="thumb")
+    p.add_argument("-w", "--width", type=int, default=100, help="max width in px")
+    p.add_argument("src", help="input image")
+    p.add_argument("dest", help="output thumbnail path")
+    args = p.parse_args()
+
+    img = Image.open(args.src)
+    w = args.width
+    h = round(img.height * w / img.width)
+    img.thumbnail((w, h), Image.LANCZOS)
+    img.save(args.dest)
+    print(f"{args.src} ({img.width}x{img.height}) -> {args.dest}")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
 ```
 
 ## 2.4 Install the environment
@@ -61,56 +70,7 @@ if __name__ == "__main__":
 pixi install
 ```
 
-This creates `pixi.lock`, which pins every dependency for reproducibility.
-
----
-
-## Exercises
-
-**Exercise 2.1** — Fill in the missing word. The manifest file is called `pixi.____`:
-
-<details>
-<summary>Show answer</summary>
-
-`toml`
-
-```bash
-pixi.toml
-```
-
-</details>
-
-**Exercise 2.2** — Fill in the missing word. The `copy` task runs the command `python ____`:
-
-```toml
-[tasks]
-copy = "python ____"
-```
-
-<details>
-<summary>Show answer</summary>
-
-`copy.py`
-
-```toml
-[tasks]
-copy = "python copy.py"
-```
-
-</details>
-
-**Exercise 2.3** — Fill in the missing word. Running `pixi ____` installs the environment and creates the lockfile:
-
-<details>
-<summary>Show answer</summary>
-
-`install`
-
-```bash
-pixi install
-```
-
-</details>
+This creates `pixi.lock`, which pins every dependency (Python + Pillow + their transitive deps) for reproducibility.
 
 ---
 

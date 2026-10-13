@@ -1,12 +1,13 @@
 [workspace]
-name = "copy"
+name = "thumb"
 version = "0.1.0"
-description = "A tiny Python CLI that copies files"
+description = "A tiny CLI that turns any image into a thumbnail"
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 
 [dependencies]
 python = ">=3.11"
+pillow = ">=10"
 
 [tasks]
-copy = "python copy.py"
+thumb = "python thumb.py"
